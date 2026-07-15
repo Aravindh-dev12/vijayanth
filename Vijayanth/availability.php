@@ -75,22 +75,10 @@
                         </div>
                         <div class="flex flex-wrap items-center gap-3 text-xs">
                             <div class="flex flex-col gap-1">
-                                <span class="font-bold text-slate-400 text-[10px] uppercase">Start Date</span>
-                                <input id="histStart" type="date" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500 bg-slate-50 text-[11px]">
+                                <span class="font-bold text-slate-400 text-[10px] uppercase">Availability Date</span>
+                                <input id="histDate" type="date" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500 bg-slate-50 text-[11px]">
                             </div>
-                            <div class="flex flex-col gap-1">
-                                <span class="font-bold text-slate-400 text-[10px] uppercase">End Date</span>
-                                <input id="histEnd" type="date" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500 bg-slate-50 text-[11px]">
-                            </div>
-                            <div class="flex flex-col gap-1">
-                                <span class="font-bold text-slate-400 text-[10px] uppercase">Start Time</span>
-                                <input id="histStartTime" type="time" value="06:00" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500 bg-slate-50 text-[11px]">
-                            </div>
-                            <div class="flex flex-col gap-1">
-                                <span class="font-bold text-slate-400 text-[10px] uppercase">End Time</span>
-                                <input id="histEndTime" type="time" value="18:00" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-500 bg-slate-50 text-[11px]">
-                            </div>
-                            </div>
+                        </div>
                     </div>
 
                     <div class="overflow-x-auto">
@@ -175,6 +163,11 @@
         let defaultWsHistoryLoaded = false;
         const wsDailyRows = {};
         const wsDateQueueByDevice = {};
+        let analyticsRowsByDevice = {};
+        let analyticsExpectedDevices = [];
+        let analyticsReceivedDevices = new Set();
+        let analyticsRequestToken = 0;
+        let analyticsFinishTimer = null;
         const hourLabels = Array.from({length: 25}, (_, i) => String(i).padStart(2, '0') + ':00');
         const pointColor = (ctx) => {
             const v = ctx.raw;
@@ -303,7 +296,7 @@
 
         function bucketHasAvailabilityData(bucket) {
             return !!bucket && (
-                (bucket.vcb && bucket.vcb.available !== undefined) ||
+                (bucket.vcb && bucket.vcb.available !== null && bucket.vcb.available !== undefined) ||
                 bucketHasInverterData(bucket)
             );
         }
@@ -316,7 +309,7 @@
         }
 
         function bucketGridAvailable(bucket) {
-            if (bucket?.vcb && bucket.vcb.available !== undefined) return !!bucket.vcb.available;
+            if (bucket?.vcb && bucket.vcb.available !== null && bucket.vcb.available !== undefined) return !!bucket.vcb.available;
             if (bucketHasInverterData(bucket)) return bucketHasActiveInverter(bucket);
             return null;
         }
@@ -324,7 +317,7 @@
         function bucketPlantAvailable(bucket) {
             if (!bucket) return null;
             if (bucketHasActiveInverter(bucket)) return true;
-            if (bucket?.vcb && bucket.vcb.available !== undefined) return !!bucket.vcb.available;
+            if (bucket?.vcb && bucket.vcb.available !== null && bucket.vcb.available !== undefined) return !!bucket.vcb.available;
             if (bucketHasInverterData(bucket)) return false;
             return null;
         }
@@ -569,7 +562,7 @@
 
                 const statusBucket = latestHistoricalBucketWithData();
                 let running = 0, offline = 0, noComm = 0;
-                
+
                 keys.forEach(k => {
                     const devData = statusBucket ? statusBucket.devices[k] : null;
                     if (devData) {
@@ -600,8 +593,8 @@
                 const totalDowntimeHours = offlineHours;
                 const runningPct = total ? ((running / total) * 100).toFixed(2) : 0;
                 const offlinePct = total ? ((offline / total) * 100).toFixed(2) : 0;
-                const availability = (activeHours + totalDowntimeHours) > 0 
-                    ? ((activeHours / (activeHours + totalDowntimeHours)) * 100).toFixed(2) 
+                const availability = (activeHours + totalDowntimeHours) > 0
+                    ? ((activeHours / (activeHours + totalDowntimeHours)) * 100).toFixed(2)
                     : "0.00";
 
                 document.getElementById('totalInvCount').textContent = total || '--';
@@ -611,7 +604,7 @@
                 document.getElementById('offlineInvPct').textContent = offlinePct + '%';
                 document.getElementById('todayDowntime').textContent = totalDowntimeHours.toFixed(2);
                 document.getElementById('todayAvailability').textContent = availability + '%';
-                
+
                 updateInvTimeline();
                 updateTimelineTicks();
                 updateHistoricalCharts();
@@ -764,14 +757,20 @@
                 if (status) { status.textContent = 'Live'; status.className = 'text-[10px] font-bold text-emerald-600'; }
                 ws.send(JSON.stringify({ type: "subscribe", unit_id: wsUnitId }));
                 ws.send(JSON.stringify({ type: "get_devices", unit_id: wsUnitId }));
-                const today = window.LiveWsStore?.todayLocal ? window.LiveWsStore.todayLocal() : new Date().toLocaleDateString('en-CA');
-                ws.send(JSON.stringify({ type: "get_daily_data", unit_id: wsUnitId, device: "VCB", date: today }));
+                if (!defaultWsHistoryLoaded) {
+                    defaultWsHistoryLoaded = true;
+                    setTimeout(fetchHistoricalAvailability, 500);
+                }
             };
             ws.onmessage = function(e) {
                 try {
                     let d = JSON.parse(e.data);
                     if (d.unit_id && d.unit_id !== wsUnitId) return;
                     window.LiveWsStore?.storeMessage(d, currentPlant);
+                    if (d.type === 'analytics_data_result') {
+                        handleAvailabilityAnalyticsResult(d);
+                        return;
+                    }
                     if (d.type === 'daily_data_result') {
                         cacheDailyRows(d);
                         const devName = d.deviceName || d.device || '';
@@ -807,7 +806,7 @@
                                     }
                                 });
                             }
-                            
+
                             // Recalculate plant status for each hour
                             for (let h = 0; h < 24; h++) {
                                 const gridOn = state.availabilityHistory.grid[h];
@@ -825,18 +824,13 @@
                             pendingWsHistory.remaining = Math.max(0, pendingWsHistory.remaining - 1);
                             if (pendingWsHistory.remaining === 0) renderPendingWsHistory();
                         }
-                        
+
                         const latest = Array.isArray(d.data) && d.data.length ? d.data[d.data.length - 1] : null;
                         if (!latest || !latest.values) return;
                         d = { type: 'data', unit_id: d.unit_id, task: /vcb/i.test(d.deviceName || latest.device || '') ? 'VCB' : 'Inverter', device: latest.device || d.deviceName, time: latest.time || '', values: latest.values };
                     }
                     if (d.type === 'device_list') {
                         applyDeviceList(d.devices);
-                        window.LiveWsStore?.requestTodayForDevices(ws, wsUnitId, d.devices);
-                        if (!defaultWsHistoryLoaded) {
-                            defaultWsHistoryLoaded = true;
-                            setTimeout(fetchHistoricalAvailability, 300);
-                        }
                         return;
                     }
                     if (d.unit_id !== wsUnitId) return;
@@ -902,11 +896,11 @@
                         let dailyGen = 0, totalGen = 0;
                         if (d.values["Daily power yields"] !== undefined) dailyGen = parseFloat(d.values["Daily power yields"]) || 0;
                         else if (d.values["daily generation"] !== undefined) dailyGen = parseFloat(d.values["daily generation"]) || 0;
-                        
+
                         if (d.values["Total power yields precise"] !== undefined) totalGen = parseFloat(d.values["Total power yields precise"]) || 0;
                         else if (d.values["Total power yields"] !== undefined) totalGen = parseFloat(d.values["Total power yields"]) || 0;
                         else if (d.values["total generation"] !== undefined) totalGen = parseFloat(d.values["total generation"]) || 0;
-                        
+
                         const devName = canonicalInverterName(d.device || "Unknown Inverter");
                         liveInvDataReceived = true;
                         ensureAvailabilityInverter(devName);
@@ -926,7 +920,7 @@
                             }
                         }
                         if (d.values["Total active power"] !== undefined) hasPowerValue = d.values["Total active power"] !== null;
-                        
+
                         let dcPwr = 0, acCurr = 0, acVolt = 0;
                         for (const pk in d.values) {
                             const pkl = pk.toLowerCase();
@@ -956,7 +950,7 @@
                     if (!isHistoricalMode) {
                         updateDash();
                     }
-                } catch(err) {}
+                } catch(err) { console.error('[Availability] WebSocket message error:', err); }
             };
             ws.onclose = function() {
                 document.getElementById('refreshPulse').className = 'w-2.5 h-2.5 bg-red-500 rounded-full';
@@ -968,112 +962,120 @@
 
         function historicalHasRows(rows) {
             return Array.isArray(rows) && rows.some(bucket => {
-                return (bucket.vcb && bucket.vcb.available !== undefined) || Object.keys(bucket.devices || {}).length > 0;
+                return (bucket.vcb && bucket.vcb.available !== null && bucket.vcb.available !== undefined) || Object.keys(bucket.devices || {}).length > 0;
             });
         }
 
-        function renderPendingWsHistory() {
-            if (!pendingWsHistory) return;
-            const { start, end, startTime, endTime, period, method } = pendingWsHistory;
-            historicalData = buildWsAvailabilityHistory(start, end, startTime, endTime, period, method);
+        function availabilityAnalyticsPoints(message) {
+            const rawDevice = String(message.deviceName || message.device || message.request?.device || '');
+            let points = message.data ?? message.analyticsData ?? message.result ?? [];
+            if (!Array.isArray(points) && points && typeof points === 'object') {
+                points = points[rawDevice] ?? points.data ?? points.points ?? Object.values(points).flat();
+            }
+            return Array.isArray(points) ? points : [];
+        }
+
+        function buildUniversalAvailability(date) {
+            const period = 5;
+            const buckets = [];
+            for (let minute = 0; minute < 24 * 60; minute += period) {
+                const hh = String(Math.floor(minute / 60)).padStart(2, '0');
+                const mm = String(minute % 60).padStart(2, '0');
+                buckets.push({ time: `${date} ${hh}:${mm}`, devices: {}, vcb: { available: null } });
+            }
+
+            Object.entries(analyticsRowsByDevice).forEach(([device, points]) => {
+                const canon = ensureAvailabilityInverter(device);
+                points.forEach(point => {
+                    const stamp = String(point?.timestamp ?? point?.dateTime ?? point?.datetime ?? `${point?.date || date} ${point?.time || ''}`);
+                    const match = stamp.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{1,2}):(\d{2})/);
+                    if (!match || `${match[1]}-${match[2]}-${match[3]}` !== date) return;
+                    const minute = Number(match[4]) * 60 + Number(match[5]);
+                    // Keep the 24-hour UI, but treat non-generating night hours as
+                    // no-data. Availability is measured only in the solar operating
+                    // window requested for this plant: 06:00 through 19:30.
+                    if (minute < 6 * 60 || minute > (19 * 60 + 30)) return;
+                    const index = Math.min(buckets.length - 1, Math.max(0, Math.floor(minute / period)));
+                    const value = Number(point?.value ?? point?.last ?? point?.aggregatedValue);
+                    if (Number.isFinite(value)) buckets[index].devices[canon] = { available: value > 0.5, fault: value <= 0.5 };
+                });
+            });
+
+            buckets.forEach(bucket => {
+                if (Object.keys(bucket.devices).length) bucket.vcb.available = bucketHasActiveInverter(bucket);
+            });
+            return buckets;
+        }
+
+        function finishAvailabilityAnalytics(token) {
+            if (token !== analyticsRequestToken) return;
+            if (analyticsFinishTimer) { clearTimeout(analyticsFinishTimer); analyticsFinishTimer = null; }
+            const date = document.getElementById('histDate').value;
+            historicalData = buildUniversalAvailability(date);
             isHistoricalMode = true;
-            const hasRows = historicalHasRows(historicalData);
-            document.getElementById('timelineDate').textContent = hasRows
-                ? `${start} ${startTime} to ${end} ${endTime} (${period}m, ${method}) - WebSocket`
-                : `No WebSocket rows found for ${start} ${startTime} to ${end} ${endTime} (${period}m, ${method})`;
+            const received = Object.keys(analyticsRowsByDevice).length;
+            document.getElementById('timelineDate').textContent = received
+                ? `${date} 00:00–23:59 · Vinoba Universal Analytics · ${received}/${analyticsExpectedDevices.length} inverters`
+                : `No Universal Analytics data found for ${date}`;
             updateAvailabilityDashboard();
-            pendingWsHistory = null;
+            updateTimelineTicks();
+        }
+
+        function handleAvailabilityAnalyticsResult(message) {
+            const rawDevice = String(message.deviceName || message.device || message.request?.device || '');
+            if (!/inv/i.test(rawDevice)) return;
+            analyticsRowsByDevice[rawDevice] = availabilityAnalyticsPoints(message);
+            analyticsReceivedDevices.add(rawDevice.toLowerCase());
+            const complete = analyticsExpectedDevices.length && analyticsExpectedDevices.every(name => analyticsReceivedDevices.has(name.toLowerCase()));
+            if (complete) finishAvailabilityAnalytics(analyticsRequestToken);
         }
 
         function fetchHistoricalAvailability() {
-            const start = document.getElementById('histStart').value;
-            const end = document.getElementById('histEnd').value;
-            const startTime = document.getElementById('histStartTime').value || '06:00';
-            const endTime = document.getElementById('histEndTime').value || '18:00';
-            const period = 5; // Fixed 5-minute period for real-time WebSocket data
-            const method = 'last'; // Fixed 'last' method for WebSocket aggregation
-
-            if (!start || !end) {
-                alert('Please select start and end dates.');
-                return;
-            }
-
-            const wsReady = availabilityWs && availabilityWs.readyState === WebSocket.OPEN;
-            if (!wsReady) {
+            const date = document.getElementById('histDate').value || localDateString();
+            if (!availabilityWs || availabilityWs.readyState !== WebSocket.OPEN) {
                 document.getElementById('timelineDate').textContent = 'Waiting for WebSocket connection...';
-                setTimeout(fetchHistoricalAvailability, 1000);
+                setTimeout(fetchHistoricalAvailability, 750);
                 return;
             }
-
-            const dates = dateRange(start, end);
-            const invDevices = (latestDeviceList || []).filter(device => /inv/i.test(device.name || device.device || ''));
-            if (!invDevices.length) {
-                availabilityWs.send(JSON.stringify({ type: "get_devices", unit_id: wsUnitId }));
-                document.getElementById('timelineDate').textContent = 'Waiting for inverter device list...';
-                setTimeout(fetchHistoricalAvailability, 1200);
-                return;
+            let devices = (latestDeviceList || [])
+                .map(device => typeof device === 'string' ? device : (device.name || device.device || ''))
+                .filter(name => /inv/i.test(name));
+            if (!devices.length) {
+                const count = Number(plantConfig[currentPlant]?.inverter_count || 0);
+                devices = Array.from({ length: count }, (_, i) => `inverter${i + 1}`);
             }
 
-            document.getElementById('timelineDate').textContent = `Loading WebSocket data ${start} ${startTime} to ${end} ${endTime} (5m, last)...`;
-            pendingWsHistory = { start, end, startTime, endTime, period, method, dates, remaining: invDevices.length * dates.length };
-            invDevices.forEach(device => {
-                const rawName = (device.name || device.device || '').toString();
-                const canon = canonicalInverterName(rawName);
-                ensureAvailabilityInverter(canon);
-                dates.forEach(date => {
-                    wsDailyRows[`${canon}|${date}`] = [];
-                    if (!wsDateQueueByDevice[canon]) wsDateQueueByDevice[canon] = [];
-                    wsDateQueueByDevice[canon].push(date);
-                    availabilityWs.send(JSON.stringify({ type: "get_daily_data", unit_id: wsUnitId, device: rawName, date }));
-                });
-            });
-            setTimeout(() => {
-                if (pendingWsHistory) renderPendingWsHistory();
-            }, Math.max(1500, Math.min(5000, pendingWsHistory.remaining * 120)));
+            const token = ++analyticsRequestToken;
+            analyticsRowsByDevice = {};
+            analyticsExpectedDevices = devices.slice();
+            analyticsReceivedDevices = new Set();
+            document.getElementById('timelineDate').textContent = `Loading ${date} from Vinoba Universal Analytics...`;
+            devices.forEach(device => availabilityWs.send(JSON.stringify({
+                type: 'get_analytics_data', unit_id: wsUnitId, device,
+                tag: 'Total active power', startDate: date, endDate: date,
+                startTime: '00:00', endTime: '23:59', timePeriod: '5', method: 'last'
+            })));
+            if (analyticsFinishTimer) clearTimeout(analyticsFinishTimer);
+            analyticsFinishTimer = setTimeout(() => finishAvailabilityAnalytics(token), 15000);
         }
 
         function clearHistoricalAvailability() {
-            isHistoricalMode = false;
-            historicalData = null;
-            
-            const todayStr = localDateString();
-            document.getElementById('histStart').value = todayStr;
-            document.getElementById('histEnd').value = todayStr;
-            document.getElementById('histStartTime').value = "06:00";
-            document.getElementById('histEndTime').value = "18:00";
-
-            document.getElementById('timelineDate').textContent = `${todayStr} 00:00 to ${todayStr} 23:59 (60m, last)`;
-
-            restoreLiveCharts();
+            document.getElementById('histDate').value = localDateString();
             fetchHistoricalAvailability();
         }
 
         function updateTimelineTicks() {
             const container = document.getElementById('timelineTicks');
             if (!container) return;
-
-            if (isHistoricalMode && historicalData && historicalData.length) {
-                const tickCount = Math.min(12, historicalData.length - 1);
-                let ticksHtml = '';
-                const steps = Math.max(1, tickCount);
-                for (let i = 0; i <= steps; i++) {
-                    const idx = Math.round(i * (historicalData.length - 1) / steps);
-                    const bucket = historicalData[idx];
-                    const timeOnly = bucket.time.split(' ')[1] || bucket.time;
-                    ticksHtml += `<div class="flex-1 text-center truncate px-0.5">${timeOnly}</div>`;
-                }
-                container.innerHTML = ticksHtml;
-            } else {
-                container.innerHTML = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0') + ':00')
-                    .map(t => `<div class="flex-1 text-center">${t}</div>`).join('');
-            }
+            container.innerHTML = Array.from({length: 24}, (_, i) => String(i).padStart(2, '0') + ':00')
+                .map(t => `<div class="flex-1 text-center">${t}</div>`).join('');
         }
 
         function updateHistoricalCharts() {
             if (!gridAvailChart || !plantAvailChart || !historicalData) return;
 
             const labels = historicalData.map(bucket => bucket.time);
-            
+
             const gridData = historicalData.map(bucket => {
                 const available = bucketGridAvailable(bucket);
                 return available === null ? null : (available ? 100 : 0);
@@ -1106,26 +1108,23 @@
             gridAvailChart.options.scales.x.ticks.maxTicksLimit = 25;
             plantAvailChart.options.scales.x.ticks.autoSkip = false;
             plantAvailChart.options.scales.x.ticks.maxTicksLimit = 25;
-            
+
             updateAvailabilityCharts();
         }
 
-        // Initialize historical search dates to today
+        // One date controls a fixed 24-hour Universal Analytics query.
         const todayStr = localDateString();
-        document.getElementById('histStart').value = todayStr;
-        document.getElementById('histEnd').value = todayStr;
-        document.getElementById('histStartTime').value = "00:00";
-        document.getElementById('histEndTime').value = "23:59";
+        document.getElementById('histDate').value = todayStr;
 
         let availabilityAutoFetchTimer = null;
         function scheduleAvailabilityFetch() {
             clearTimeout(availabilityAutoFetchTimer);
             availabilityAutoFetchTimer = setTimeout(fetchHistoricalAvailability, 350);
         }
-        ['histStart', 'histEnd', 'histStartTime', 'histEndTime', 'histPeriod', 'histMethod'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.addEventListener('change', scheduleAvailabilityFetch);
-        });
+        document.getElementById('histDate').addEventListener('change', scheduleAvailabilityFetch);
+        setInterval(() => {
+            if (document.getElementById('histDate').value === localDateString()) fetchHistoricalAvailability();
+        }, 60000);
 
         connectWS();
     </script>

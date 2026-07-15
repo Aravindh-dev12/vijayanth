@@ -220,10 +220,11 @@
                             console.log('[Reports] ← WS message:', d.type, 'unit:', d.unit_id);
                         }
                         
-                        // Handle daily_data_result and monthly_data_result
+                        // Ignore legacy daily/monthly broadcasts. The report must be
+                        // completed only from Universal Analytics responses so an
+                        // unrelated partial broadcast cannot replace the 14-inverter table.
                         if (d.type === 'daily_data_result' || d.type === 'monthly_data_result') {
-                            console.log('[Reports] ← Received', d.type, 'for device:', d.deviceName || d.device);
-                            handleDailyDataResult(d);
+                            console.log('[Reports] ⏭ Ignoring legacy', d.type, 'for:', d.deviceName || d.device);
                             return;
                         }
 
@@ -323,8 +324,8 @@
                 tag: 'Daily power yields',
                 startDate: range.startDate,
                 endDate: range.endDate,
-                startTime: '06:00',
-                endTime: '18:00',
+                startTime: '00:00',
+                endTime: '23:59',
                 timePeriod: '60',
                 method: 'last'
             })));
@@ -366,16 +367,24 @@
         function finishUniversalAnalytics() {
             if (!pendingReportRequest) return;
             const type = document.getElementById('reportType').value;
-            const invNames = Object.keys(analyticsDataByDevice).sort((a, b) => (parseInt(a.match(/\d+/)?.[0] || 0) - parseInt(b.match(/\d+/)?.[0] || 0)));
+            const invNames = (expectedDevices.length ? expectedDevices : Object.keys(analyticsDataByDevice))
+                .slice().sort((a, b) => (parseInt(a.match(/\d+/)?.[0] || 0) - parseInt(b.match(/\d+/)?.[0] || 0)));
             const slots = {};
 
+            if (type === 'daily') {
+                for (let hour = 0; hour < 24; hour++) {
+                    const label = `${String(hour).padStart(2, '0')}:00`;
+                    slots[label] = { time_label: label, _latest: {} };
+                }
+            }
+
             invNames.forEach((device, index) => {
-                analyticsDataByDevice[device].forEach(point => {
+                const matchedKey = Object.keys(analyticsDataByDevice).find(key => key.toLowerCase() === String(device).toLowerCase());
+                (analyticsDataByDevice[matchedKey] || []).forEach(point => {
                     const timestamp = analyticsPointTime(point);
                     const match = timestamp.match(/(\d{4})-(\d{2})-(\d{2})[T\s]?(\d{2})?/);
                     if (!match) return;
                     const hour = Number(match[4] || 0);
-                    if (hour < 6 || hour > 18) return;
                     const label = type === 'daily' ? `${String(hour).padStart(2, '0')}:00` : `${match[3]}-${match[2]}-${match[1]}`;
                     if (!slots[label]) slots[label] = { time_label: label, _latest: {} };
                     // Server already applies method:last. For monthly, retain the final
@@ -621,7 +630,7 @@
                 });
                 
                 // Skip rows with no generation (all zeros)
-                if (!hasGeneration && rowInvTotal === 0) {
+                if (!hasGeneration && rowInvTotal === 0 && type !== 'daily') {
                     return;
                 }
                 
@@ -678,6 +687,9 @@
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
                     return false;
                 }
+                // The Vinoba service requires a unit subscription before serving
+                // analytics requests. It may finish its legacy daily stream first,
+                // so the report timeout below allows that queue to drain.
                 ws.send(JSON.stringify({ type: 'subscribe', unit_id: plant.unit_id }));
                 ws.send(JSON.stringify({ type: 'get_devices', unit_id: plant.unit_id }));
                 setTimeout(() => {
@@ -690,7 +702,16 @@
             }
 
             if (!sendDeviceListRequest()) {
-                setTimeout(sendDeviceListRequest, 1200);
+                const waitStarted = Date.now();
+                const waitForSocket = setInterval(() => {
+                    if (token !== analyticsRequestToken || !pendingReportRequest) {
+                        clearInterval(waitForSocket);
+                        return;
+                    }
+                    if (sendDeviceListRequest() || Date.now() - waitStarted > 10000) {
+                        clearInterval(waitForSocket);
+                    }
+                }, 500);
             }
 
             if (wsReportTimeout) clearTimeout(wsReportTimeout);
@@ -698,7 +719,7 @@
                 if (token !== analyticsRequestToken || !pendingReportRequest) return;
                 if (Object.keys(analyticsDataByDevice).length) finishUniversalAnalytics();
                 else loadCachedReport('Universal Analytics timeout');
-            }, 15000);
+            }, 45000);
         }
 
         function loadCachedReport(reason) {
@@ -805,7 +826,7 @@
             // Daily rows contain cumulative readings, so the report total is the
             // final row. Monthly rows contain one final reading per day and are summed.
             if (type === 'daily' && exportRows.length) {
-                const finalRow = exportRows[exportRows.length - 1];
+                const finalRow = exportRows.slice().reverse().find(row => Number(row.total_generation) > 0) || exportRows[exportRows.length - 1];
                 invNames.forEach(name => { totInvKwh[name] = Number(finalRow.inverters[name]) || 0; });
                 totInvTotal = Number(finalRow.total_generation) || 0;
             }

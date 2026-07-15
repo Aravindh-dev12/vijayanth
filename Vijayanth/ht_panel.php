@@ -545,7 +545,11 @@ $htFirstInvX = $htMainCenterX - (($htInverterCount - 1) * $htInvSpacing / 2);
 
             const values = message.values;
             let power = readNumber(values["Total active power"]) || 0;
-            let dcPower = readNumber(values["Total DC power"]) || power;
+            let dcPower = readNumber(values["Total DC power"]);
+            // Vinoba publishes Total DC power in watts while AC power is in kW.
+            // Normalize the DC value before aggregating it for the SLD display.
+            if (dcPower !== null && Math.abs(dcPower) > 10000) dcPower /= 1000;
+            if (dcPower === null) dcPower = power;
             let dailyGen = readNumber(values["Daily power yields"]) || 0;
             htState.inverters[invNo] = {
                 power,
