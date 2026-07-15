@@ -127,6 +127,9 @@
         let expectedDevices = [];
         let dailyDataByDevice = {};
         let receivedDeviceCount = 0;
+        let analyticsDataByDevice = {};
+        let analyticsReceived = new Set();
+        let analyticsRequestToken = 0;
         
         const dateInput = document.getElementById('dateSelect');
         const monthInput = document.getElementById('monthSelect');
@@ -223,6 +226,11 @@
                             handleDailyDataResult(d);
                             return;
                         }
+
+                        if (d.type === 'analytics_data_result') {
+                            handleAnalyticsDataResult(d);
+                            return;
+                        }
                         
                         // Handle device list response
                         if (d.type === 'device_list') {
@@ -265,7 +273,7 @@
             
             // Filter only inverter devices
             const inverters = deviceList.filter(dev => {
-                const name = (dev.name || dev.deviceName || '').toLowerCase();
+                const name = (typeof dev === 'string' ? dev : (dev.name || dev.deviceName || dev.device || '')).toLowerCase();
                 return name.includes('inverter') && !name.includes('vcb');
             });
             
@@ -284,29 +292,112 @@
                 return;
             }
             
-            // Now request daily data for each inverter
-            const type = document.getElementById('reportType').value;
-            const selectedDate = type === 'daily' ? dateInput.value : monthInput.value;
+            // Match Vinoba Universal Analytics: one aggregated request per inverter.
             const plantId = plantSelect.value;
             const plant = plants.find(p => p.id === plantId);
-            
-            expectedDevices = inverters.map(inv => inv.name || inv.deviceName);
-            console.log('[Reports] ✓ Requesting daily data for', expectedDevices.length, 'devices on date:', selectedDate);
-            
-            // Request data for each inverter
-            inverters.forEach(inv => {
-                const deviceName = inv.name || inv.deviceName;
-                const requestMsg = {
-                    type: 'get_daily_data',
-                    unit_id: plant.unit_id,
-                    device: deviceName,
-                    date: selectedDate
-                };
-                ws.send(JSON.stringify(requestMsg));
-                console.log('[Reports] → Sent get_daily_data:', deviceName);
+
+            expectedDevices = inverters.map(inv => typeof inv === 'string' ? inv : (inv.name || inv.deviceName || inv.device));
+            requestUniversalAnalytics(plant, expectedDevices);
+        }
+
+        function analyticsRange(type, selectedDate) {
+            if (type === 'daily') return { startDate: selectedDate, endDate: selectedDate };
+            const startDate = selectedDate + '-01';
+            const end = new Date(Number(selectedDate.slice(0, 4)), Number(selectedDate.slice(5, 7)), 0);
+            const endDate = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+            return { startDate, endDate };
+        }
+
+        function requestUniversalAnalytics(plant, devices) {
+            const type = document.getElementById('reportType').value;
+            const selectedDate = type === 'daily' ? dateInput.value : monthInput.value;
+            const range = analyticsRange(type, selectedDate);
+            expectedDevices = devices.slice();
+            analyticsDataByDevice = {};
+            analyticsReceived = new Set();
+
+            devices.forEach(device => ws.send(JSON.stringify({
+                type: 'get_analytics_data',
+                unit_id: plant.unit_id,
+                device,
+                tag: 'Daily power yields',
+                startDate: range.startDate,
+                endDate: range.endDate,
+                startTime: '06:00',
+                endTime: '18:00',
+                timePeriod: '60',
+                method: 'last'
+            })));
+            console.log('[Reports] → Universal Analytics requested for', devices.length, 'inverters');
+        }
+
+        function analyticsPoints(d) {
+            let points = d.data ?? d.analyticsData ?? d.result ?? d.results ?? [];
+            if (!Array.isArray(points) && points && typeof points === 'object') {
+                const deviceName = String(d.deviceName || d.device || d.request?.device || '');
+                points = points[deviceName] ?? points.data ?? points.points ?? points.values ?? Object.values(points).flat();
+            }
+            return Array.isArray(points) ? points : [];
+        }
+
+        function analyticsPointValue(point) {
+            if (typeof point === 'number' || typeof point === 'string') return Number(point) || 0;
+            const values = point?.values || {};
+            return Number(point?.value ?? point?.last ?? point?.aggregatedValue ??
+                values['Daily power yields'] ?? values['daily power yields'] ?? 0) || 0;
+        }
+
+        function analyticsPointTime(point) {
+            return String(point?.timestamp ?? point?.time ?? point?.dateTime ?? point?.datetime ?? point?.bucket ?? point?.label ?? '');
+        }
+
+        function handleAnalyticsDataResult(d) {
+            if (!pendingReportRequest) return;
+            const deviceName = String(d.deviceName || d.device || d.request?.device || '');
+            if (!deviceName || !/inverter/i.test(deviceName)) return;
+            analyticsDataByDevice[deviceName] = analyticsPoints(d);
+            analyticsReceived.add(deviceName.toLowerCase());
+            console.log('[Reports] ✓ Analytics received:', deviceName, analyticsDataByDevice[deviceName].length, 'points');
+
+            const allReceived = expectedDevices.length > 0 && expectedDevices.every(name => analyticsReceived.has(String(name).toLowerCase()));
+            if (allReceived) finishUniversalAnalytics();
+        }
+
+        function finishUniversalAnalytics() {
+            if (!pendingReportRequest) return;
+            const type = document.getElementById('reportType').value;
+            const invNames = Object.keys(analyticsDataByDevice).sort((a, b) => (parseInt(a.match(/\d+/)?.[0] || 0) - parseInt(b.match(/\d+/)?.[0] || 0)));
+            const slots = {};
+
+            invNames.forEach((device, index) => {
+                analyticsDataByDevice[device].forEach(point => {
+                    const timestamp = analyticsPointTime(point);
+                    const match = timestamp.match(/(\d{4})-(\d{2})-(\d{2})[T\s]?(\d{2})?/);
+                    if (!match) return;
+                    const hour = Number(match[4] || 0);
+                    if (hour < 6 || hour > 18) return;
+                    const label = type === 'daily' ? `${String(hour).padStart(2, '0')}:00` : `${match[3]}-${match[2]}-${match[1]}`;
+                    if (!slots[label]) slots[label] = { time_label: label, _latest: {} };
+                    // Server already applies method:last. For monthly, retain the final
+                    // hourly cumulative reading for each inverter on each day.
+                    const key = 'inv' + (index + 1) + '_kwh';
+                    if (!slots[label]._latest[key] || timestamp >= slots[label]._latest[key]) {
+                        slots[label][key] = analyticsPointValue(point);
+                        slots[label]._latest[key] = timestamp;
+                    }
+                });
             });
-            
-            console.log('[Reports] ⏳ Waiting for', expectedDevices.length, 'daily_data_result messages...');
+
+            const rows = Object.values(slots).sort((a, b) => a.time_label.localeCompare(b.time_label));
+            rows.forEach(row => {
+                delete row._latest;
+                row.inv_total_kwh = invNames.reduce((sum, _, i) => sum + (Number(row['inv' + (i + 1) + '_kwh']) || 0), 0);
+            });
+            pendingReportRequest = false;
+            if (wsReportTimeout) { clearTimeout(wsReportTimeout); wsReportTimeout = null; }
+            if (!rows.length) return loadCachedReport('Universal Analytics returned no rows');
+            lastReportData = { type, data: rows, meta: { inv_names: invNames, source: 'vinoba_universal_analytics', method: 'last', period_minutes: 60 } };
+            renderReportData(type, rows, invNames);
         }
         
         function handleDailyDataResult(d) {
@@ -574,102 +665,60 @@
             document.getElementById('displayDate').innerText = dateObj.toLocaleDateString('en-IN', options);
             
             const tbody = document.getElementById('reportTableBody');
-            tbody.innerHTML = '<tr><td colspan="30" class="py-12 bg-white"><div class="flex flex-col items-center justify-center"><div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div><p class="mt-3 text-sm font-bold text-gray-600">Loading cached report...</p></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="30" class="py-12 bg-white"><div class="flex flex-col items-center justify-center"><div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div><p class="mt-3 text-sm font-bold text-gray-600">Loading Vinoba Universal Analytics...</p></div></td></tr>';
 
-            // Reports are built from telemetry continuously stored by ws_collector.js.
-            // This is one fast request instead of waiting for every device over WS.
-            const reportUrl = `api_reports.php?type=${encodeURIComponent(type)}&date=${encodeURIComponent(selectedDate)}&plant=${encodeURIComponent(plantId)}`;
-            fetch(reportUrl, { cache: 'no-store' })
-                .then(response => {
-                    if (!response.ok) throw new Error(`Report HTTP ${response.status}`);
-                    return response.json();
-                })
-                .then(result => {
-                    if (!result.success) throw new Error(result.error || 'Report request failed');
-                    const rows = result.data || [];
-                    const invNames = result.meta?.inv_names || [];
-                    lastReportData = { type, data: rows, meta: { inv_names: invNames } };
-                    renderReportData(type, rows, invNames);
-                    updateLiveStatus();
-                })
-                .catch(error => {
-                    console.error('[Reports] Fast report failed:', error);
-                    tbody.innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
-                });
-            return;
-
-            // Reset data collection
             pendingReportRequest = true;
-            dailyDataByDevice = {};
-            receivedDeviceCount = 0;
             expectedDevices = [];
-            if (window.reportBuildTimeout) {
-                clearTimeout(window.reportBuildTimeout);
-                window.reportBuildTimeout = null;
-            }
-            
+            analyticsDataByDevice = {};
+            analyticsReceived = new Set();
+            const token = ++analyticsRequestToken;
             connectReportWS();
 
             function sendDeviceListRequest() {
                 if (!ws || ws.readyState !== WebSocket.OPEN) {
-                    console.warn('[Reports] Cannot send request - WS not open. State:', ws?.readyState);
                     return false;
                 }
-                
-                // Step 1: Subscribe
-                const subMsg = { type: 'subscribe', unit_id: plant.unit_id };
-                ws.send(JSON.stringify(subMsg));
-                console.log('[Reports] ✓ Sent subscribe:', subMsg);
-                
-                // Step 2: Request device list
-                const devicesMsg = { type: 'get_devices', unit_id: plant.unit_id };
-                ws.send(JSON.stringify(devicesMsg));
-                console.log('[Reports] ✓ Sent get_devices:', devicesMsg);
-                
-                // Fallback: If device_list doesn't arrive in 3 seconds, request data for common inverter names
+                ws.send(JSON.stringify({ type: 'subscribe', unit_id: plant.unit_id }));
+                ws.send(JSON.stringify({ type: 'get_devices', unit_id: plant.unit_id }));
                 setTimeout(() => {
-                    if (expectedDevices.length === 0 && pendingReportRequest) {
-                        console.log('[Reports] ⚠ device_list timeout, requesting data for known inverter names...');
-                        
-                        // Request data for inverter1 through inverter20 (common names)
-                        for (let i = 1; i <= 20; i++) {
-                            const deviceName = `inverter${i}`;
-                            const requestMsg = {
-                                type: 'get_daily_data',
-                                unit_id: plant.unit_id,
-                                device: deviceName,
-                                date: selectedDate
-                            };
-                            ws.send(JSON.stringify(requestMsg));
-                        }
-                        console.log('[Reports] ✓ Requested data for inverter1-inverter20');
-                        console.log('[Reports] ⏳ Collecting responses (will auto-detect which inverters exist)...');
+                    if (token === analyticsRequestToken && expectedDevices.length === 0 && pendingReportRequest) {
+                        const count = Number(plantConfig?.[plantId]?.inverter_count || (plantId === 'vijayanth' ? 14 : 10));
+                        requestUniversalAnalytics(plant, Array.from({ length: count }, (_, i) => `inverter${i + 1}`));
                     }
                 }, 3000);
-                
                 return true;
             }
 
             if (!sendDeviceListRequest()) {
-                setTimeout(() => sendDeviceListRequest(), 2000);
+                setTimeout(sendDeviceListRequest, 1200);
             }
-            
+
+            if (wsReportTimeout) clearTimeout(wsReportTimeout);
             wsReportTimeout = setTimeout(() => {
-                if (pendingReportRequest) {
-                    console.error('[Reports] ✗ Timeout - no data received in 30s');
-                    console.error('[Reports] Received devices:', receivedDeviceCount);
-                    console.error('[Reports] Device data:', Object.keys(dailyDataByDevice));
-                    pendingReportRequest = false;
-                    
-                    // If we got some data, show it anyway
-                    if (receivedDeviceCount > 0) {
-                        console.log('[Reports] Building report with partial data...');
-                        buildReportFromDailyData();
-                    } else {
-                        tbody.innerHTML = '<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold mb-1">Connection Timeout</div><div class="text-gray-400 text-xs">No data received from WebSocket</div><div class="text-gray-400 text-xs mt-2">Ensure ws_collector.js is running for ' + plant.unit_id + '</div></td></tr>';
-                    }
-                }
-            }, 30000);
+                if (token !== analyticsRequestToken || !pendingReportRequest) return;
+                if (Object.keys(analyticsDataByDevice).length) finishUniversalAnalytics();
+                else loadCachedReport('Universal Analytics timeout');
+            }, 15000);
+        }
+
+        function loadCachedReport(reason) {
+            pendingReportRequest = false;
+            const type = document.getElementById('reportType').value;
+            const selectedDate = type === 'daily' ? dateInput.value : monthInput.value;
+            const plantId = plantSelect.value;
+            console.warn('[Reports] Falling back to database cache:', reason);
+            fetch(`api_reports.php?type=${encodeURIComponent(type)}&date=${encodeURIComponent(selectedDate)}&plant=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
+                .then(response => { if (!response.ok) throw new Error(`Report HTTP ${response.status}`); return response.json(); })
+                .then(result => {
+                    if (!result.success) throw new Error(result.error || 'Report request failed');
+                    const rows = result.data || [];
+                    const invNames = result.meta?.inv_names || [];
+                    lastReportData = { type, data: rows, meta: { ...result.meta, inv_names: invNames, fallback_reason: reason } };
+                    renderReportData(type, rows, invNames);
+                })
+                .catch(error => {
+                    document.getElementById('reportTableBody').innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
+                });
         }
 
         function fmt(v) { return v !== undefined && v !== null ? Number(v).toFixed(2) : '0.00'; }
@@ -752,6 +801,14 @@
                 };
                 return exportRow;
             });
+
+            // Daily rows contain cumulative readings, so the report total is the
+            // final row. Monthly rows contain one final reading per day and are summed.
+            if (type === 'daily' && exportRows.length) {
+                const finalRow = exportRows[exportRows.length - 1];
+                invNames.forEach(name => { totInvKwh[name] = Number(finalRow.inverters[name]) || 0; });
+                totInvTotal = Number(finalRow.total_generation) || 0;
+            }
             
             const exportTotals = {
                 inverters: {},
