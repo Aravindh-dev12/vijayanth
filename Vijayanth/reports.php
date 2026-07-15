@@ -324,9 +324,9 @@
                 tag: 'Daily power yields',
                 startDate: range.startDate,
                 endDate: range.endDate,
-                startTime: '00:00',
-                endTime: '23:59',
-                timePeriod: '60',
+                startTime: '06:00',
+                endTime: '18:30',
+                timePeriod: '30',
                 method: 'last'
             })));
             console.log('[Reports] → Universal Analytics requested for', devices.length, 'inverters');
@@ -372,8 +372,13 @@
             const slots = {};
 
             if (type === 'daily') {
-                for (let hour = 0; hour < 24; hour++) {
-                    const label = `${String(hour).padStart(2, '0')}:00`;
+                // Always show the complete solar operating window, including
+                // empty intervals, so a delayed or missing inverter response
+                // cannot remove a row from the report.
+                for (let minutes = 6 * 60; minutes <= 18 * 60 + 30; minutes += 30) {
+                    const hour = Math.floor(minutes / 60);
+                    const minute = minutes % 60;
+                    const label = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
                     slots[label] = { time_label: label, _latest: {} };
                 }
             }
@@ -382,10 +387,16 @@
                 const matchedKey = Object.keys(analyticsDataByDevice).find(key => key.toLowerCase() === String(device).toLowerCase());
                 (analyticsDataByDevice[matchedKey] || []).forEach(point => {
                     const timestamp = analyticsPointTime(point);
-                    const match = timestamp.match(/(\d{4})-(\d{2})-(\d{2})[T\s]?(\d{2})?/);
+                    const match = timestamp.match(/(\d{4})-(\d{2})-(\d{2})[T\s]?(\d{2})?:?(\d{2})?/);
                     if (!match) return;
                     const hour = Number(match[4] || 0);
-                    const label = type === 'daily' ? `${String(hour).padStart(2, '0')}:00` : `${match[3]}-${match[2]}-${match[1]}`;
+                    const minute = Number(match[5] || 0);
+                    const totalMinutes = hour * 60 + minute;
+                    if (type === 'daily' && (totalMinutes < 6 * 60 || totalMinutes > 18 * 60 + 30)) return;
+                    const bucketMinute = minute < 30 ? 0 : 30;
+                    const label = type === 'daily'
+                        ? `${String(hour).padStart(2, '0')}:${String(bucketMinute).padStart(2, '0')}`
+                        : `${match[3]}-${match[2]}-${match[1]}`;
                     if (!slots[label]) slots[label] = { time_label: label, _latest: {} };
                     // Server already applies method:last. For monthly, retain the final
                     // hourly cumulative reading for each inverter on each day.
@@ -405,7 +416,7 @@
             pendingReportRequest = false;
             if (wsReportTimeout) { clearTimeout(wsReportTimeout); wsReportTimeout = null; }
             if (!rows.length) return loadCachedReport('Universal Analytics returned no rows');
-            lastReportData = { type, data: rows, meta: { inv_names: invNames, source: 'vinoba_universal_analytics', method: 'last', period_minutes: 60 } };
+            lastReportData = { type, data: rows, meta: { inv_names: invNames, source: 'vinoba_universal_analytics', method: 'last', period_minutes: 30, start_time: '06:00', end_time: '18:30' } };
             renderReportData(type, rows, invNames);
         }
         
