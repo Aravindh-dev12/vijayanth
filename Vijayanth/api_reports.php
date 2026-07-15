@@ -33,7 +33,7 @@ $periodSql = $type === 'daily'
     ? "snapshot_at >= '{$escDate} 00:00:00' AND snapshot_at <= '{$escDate} 23:59:59'"
     : "snapshot_at >= '{$escDate}-01 00:00:00' AND snapshot_at < DATE_ADD('{$escDate}-01 00:00:00', INTERVAL 1 MONTH)";
 $bucketSql = $type === 'daily'
-    ? "DATE_FORMAT(snapshot_at, '%H:00')"
+    ? "CONCAT(DATE_FORMAT(snapshot_at, '%H:'), IF(MINUTE(snapshot_at) < 30, '00', '30'))"
     : "DATE_FORMAT(snapshot_at, '%d-%m-%Y')";
 
 $sql = "SELECT {$bucketSql} AS time_label, inverter_name,
@@ -51,7 +51,8 @@ if ($result) {
     while ($row = $result->fetch_assoc()) {
         if ($type === 'daily') {
             $hour = (int)substr($row['time_label'], 0, 2);
-            if ($hour < 6 || $hour > 18) continue;
+            $minute = (int)substr($row['time_label'], 3, 2);
+            if ($hour < 6 || $hour > 18 || ($hour === 18 && $minute > 30)) continue;
         }
         $name = (string)$row['inverter_name'];
         $names[$name] = true;
@@ -60,13 +61,23 @@ if ($result) {
 }
 $conn->close();
 
+$configuredCount = (int)($PLANTS[$plant]['inverter_count'] ?? 0);
+for ($i = 1; $i <= $configuredCount; $i++) $names['INVERTER' . $i] = true;
 $invNames = array_keys($names);
 usort($invNames, function($a, $b) {
     preg_match('/\d+/', $a, $ma); preg_match('/\d+/', $b, $mb);
     return ((int)($ma[0] ?? 0)) <=> ((int)($mb[0] ?? 0));
 });
+$orderedBuckets = $byBucket;
+if ($type === 'daily') {
+    $orderedBuckets = [];
+    for ($minutes = 6 * 60; $minutes <= 18 * 60 + 30; $minutes += 30) {
+        $label = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
+        $orderedBuckets[$label] = $byBucket[$label] ?? [];
+    }
+}
 $rows = [];
-foreach ($byBucket as $label => $values) {
+foreach ($orderedBuckets as $label => $values) {
     $row = ['time_label' => $label];
     $total = 0;
     foreach ($invNames as $i => $name) {

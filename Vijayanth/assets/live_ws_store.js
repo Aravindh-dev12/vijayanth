@@ -185,7 +185,14 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
                 keepalive: false
-            }).catch(() => {}).finally(() => {
+            }).then(async (response) => {
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok || result.status !== 'success') {
+                    throw new Error(result.message || `Storage HTTP ${response.status}`);
+                }
+            }).catch((error) => {
+                console.error('[LiveWsStore] SQL storage failed:', error.message, body.type, body.device_name);
+            }).finally(() => {
                 running--;
                 drain();
             });
@@ -261,6 +268,30 @@
                 return;
             }
             storeDataMessage(message, plantId, false);
+        },
+        storeAnalyticsResult(message, plantId) {
+            if (!message || !plantId) return;
+            const rawDevice = message.deviceName || message.device || message.request?.device || '';
+            const deviceName = canonicalInverterName(rawDevice);
+            let points = message.data ?? message.analyticsData ?? message.result ?? message.results ?? [];
+            if (!Array.isArray(points) && points && typeof points === 'object') {
+                points = points[rawDevice] ?? points.data ?? points.points ?? points.values ?? [];
+            }
+            if (!Array.isArray(points)) return;
+            points.forEach((point) => {
+                const timestamp = point?.timestamp ?? point?.time ?? point?.dateTime ?? point?.datetime ?? point?.bucket ?? '';
+                if (!timestamp) return;
+                const values = point?.values || {};
+                const dailyGen = num(point?.value ?? point?.last ?? point?.aggregatedValue ??
+                    values['Daily power yields'] ?? values['daily power yields']);
+                postStore({
+                    plant_id: plantId,
+                    device_name: deviceName,
+                    type: 'inverter_report',
+                    source_time: timestamp,
+                    payload: { dailyGen }
+                });
+            });
         },
         requestTodayForDevices(ws, unitId, devices) {
             if (!ws || ws.readyState !== WebSocket.OPEN || !Array.isArray(devices)) return;

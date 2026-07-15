@@ -1,7 +1,13 @@
 <?php
-$DB_HOST = "localhost";
-$DB_USER = "root";
-$DB_PASS = "";
+$DB_HOST = getenv('VS_DB_HOST') !== false ? getenv('VS_DB_HOST') : "localhost";
+$DB_USER = getenv('VS_DB_USER') !== false ? getenv('VS_DB_USER') : "root";
+$DB_PASS = getenv('VS_DB_PASS') !== false ? getenv('VS_DB_PASS') : "";
+$STORE_TOKEN = getenv('VS_STORE_TOKEN') !== false ? getenv('VS_STORE_TOKEN') : "";
+
+// Keep production credentials outside Git. A local file may override any of
+// the DB variables above (copy config.local.example.php to config.local.php).
+$localConfig = __DIR__ . DIRECTORY_SEPARATOR . 'config.local.php';
+if (is_file($localConfig)) require $localConfig;
 
 $PLANTS = [
     'vijayanth' => [

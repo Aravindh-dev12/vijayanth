@@ -1,17 +1,25 @@
 <?php
-// api_store.php - Stores real-time telemetry data posted by frontend and backend collectors
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
+// api_store.php - Stores real-time telemetry data posted by authenticated pages
+// or by the background collector using a private ingestion token.
 date_default_timezone_set('Asia/Kolkata');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+    http_response_code(204);
     exit;
 }
 
 header("Content-Type: application/json");
 require 'config.php';
+session_start();
+
+$providedToken = (string)($_SERVER['HTTP_X_STORE_TOKEN'] ?? '');
+$collectorAuthorized = $STORE_TOKEN !== '' && $providedToken !== '' && hash_equals($STORE_TOKEN, $providedToken);
+$sessionUser = isset($_SESSION['user']) && is_array($_SESSION['user']) ? $_SESSION['user'] : null;
+if (!$collectorAuthorized && !$sessionUser) {
+    http_response_code(401);
+    echo json_encode(["status" => "error", "message" => "Storage authentication required"]);
+    exit;
+}
 
 $raw = file_get_contents("php://input");
 $input = json_decode($raw, true);
@@ -24,6 +32,13 @@ if (!$input) {
 $plant_id = isset($input['plant_id']) ? strtolower(trim($input['plant_id'])) : '';
 if ($plant_id === 'bojaraj') {
     $plant_id = 'vijayanth';
+}
+
+if (!$collectorAuthorized && ($sessionUser['role'] ?? '') !== 'admin' &&
+    !empty($sessionUser['plant_id']) && $sessionUser['plant_id'] !== $plant_id) {
+    http_response_code(403);
+    echo json_encode(["status" => "error", "message" => "Plant access denied"]);
+    exit;
 }
 
 $type = isset($input['type']) ? trim($input['type']) : '';
@@ -54,15 +69,18 @@ if (!empty($input['source_time'])) {
     }
 }
 
-// Update telemetry_latest cache table
+// Update telemetry_latest cache table. Aggregated report points belong in the
+// historical inverter table and must not replace a full live snapshot.
 $payload_json = json_encode($payload);
-$stmtLatest = $conn->prepare("INSERT INTO telemetry_latest (plant_id, type, device_name, snapshot_at, payload_json) 
-    VALUES (?, ?, ?, ?, ?) 
-    ON DUPLICATE KEY UPDATE snapshot_at = VALUES(snapshot_at), payload_json = VALUES(payload_json)");
-if ($stmtLatest) {
-    $stmtLatest->bind_param("sssss", $plant_id, $type, $device_name, $snapshot_at, $payload_json);
-    $stmtLatest->execute();
-    $stmtLatest->close();
+if ($type !== 'inverter_report') {
+    $stmtLatest = $conn->prepare("INSERT INTO telemetry_latest (plant_id, type, device_name, snapshot_at, payload_json)
+        VALUES (?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE snapshot_at = VALUES(snapshot_at), payload_json = VALUES(payload_json)");
+    if ($stmtLatest) {
+        $stmtLatest->bind_param("sssss", $plant_id, $type, $device_name, $snapshot_at, $payload_json);
+        $stmtLatest->execute();
+        $stmtLatest->close();
+    }
 }
 
 // Keep an atomic file snapshot updated by the continuous collector. Pages can
@@ -74,7 +92,21 @@ if (in_array($type, ['inverter', 'vcb', 'transformer'], true)) {
 $success = false;
 $errorMsg = '';
 
-if ($type === 'inverter') {
+if ($type === 'inverter_report') {
+    $daily_gen_kwh = (float)($payload['dailyGen'] ?? $payload['daily_gen_kwh'] ?? 0);
+    $stmt = $conn->prepare("INSERT INTO inverter_data (plant_id, inverter_name, snapshot_at, daily_gen_kwh)
+        VALUES (?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE daily_gen_kwh = VALUES(daily_gen_kwh)");
+    if ($stmt) {
+        $stmt->bind_param("sssd", $plant_id, $device_name, $snapshot_at, $daily_gen_kwh);
+        $success = $stmt->execute();
+        if (!$success) $errorMsg = $stmt->error;
+        $stmt->close();
+    } else {
+        $errorMsg = $conn->error;
+    }
+}
+elseif ($type === 'inverter') {
     $power_kw = (float)($payload['power'] ?? 0);
     $reactive_kvar = (float)($payload['reactive'] ?? 0);
     $power_factor = (float)($payload['pf'] ?? 0);
@@ -119,7 +151,7 @@ if ($type === 'inverter') {
         fault_code = VALUES(fault_code), work_state = VALUES(work_state), status_text = VALUES(status_text)");
 
     if ($stmt) {
-        $stmt->bind_param("sssddddddddddddddddddiiissss",
+        $stmt->bind_param("sssddddddddddddddddddiiiisss",
             $plant_id, $device_name, $snapshot_at, $power_kw, $reactive_kvar, $power_factor,
             $vac_ab, $vac_bc, $vac_ca, $frequency_hz, $current_a, $current_b, $current_c,
             $efficiency, $ambient_temp, $daily_gen_kwh, $total_gen_kwh, $daily_co2_kg, $total_co2_kg,

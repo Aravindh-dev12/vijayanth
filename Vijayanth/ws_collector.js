@@ -1,5 +1,6 @@
 const API_BASE = process.env.VS_API_BASE || "http://localhost/common/Vijayanth";
 const WS_URL = process.env.VS_WS_URL || "wss://vinobasolar.scadahub.in:5001";
+const STORE_TOKEN = process.env.VS_STORE_TOKEN || "";
 
 const PLANTS = [
   { plant_id: "vijayanth", unit_id: "via-1mw" },
@@ -42,9 +43,10 @@ function canonicalInverterName(name) {
 }
 
 async function postStore(body) {
+  if (!STORE_TOKEN) throw new Error("VS_STORE_TOKEN is required for collector storage");
   const res = await fetch(`${API_BASE}/api_store.php`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "X-Store-Token": STORE_TOKEN },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`api_store.php HTTP ${res.status}`);

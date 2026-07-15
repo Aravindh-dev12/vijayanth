@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="assets/live_ws_store.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -357,6 +358,7 @@
             const deviceName = String(d.deviceName || d.device || d.request?.device || '');
             if (!deviceName || !/inverter/i.test(deviceName)) return;
             analyticsDataByDevice[deviceName] = analyticsPoints(d);
+            window.LiveWsStore?.storeAnalyticsResult(d, plantSelect.value);
             analyticsReceived.add(deviceName.toLowerCase());
             console.log('[Reports] ✓ Analytics received:', deviceName, analyticsDataByDevice[deviceName].length, 'points');
 
