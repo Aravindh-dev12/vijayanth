@@ -528,7 +528,7 @@ $plantServiceNum  = htmlspecialchars($pinfo['service_number'] ?? '');
         }
 
         function loadLatestSnapshot() {
-            return fetch(`api.php?action=get_fast_snapshot&plant_id=${encodeURIComponent(currentPlant)}`, { cache: 'no-store' })
+            return window.LiveWsStore.fastSnapshot(currentPlant)
                 .then(res => res.json())
                 .then(res => {
                     if (res.status !== 'success' || !res.data) return;

@@ -574,7 +574,29 @@
             document.getElementById('displayDate').innerText = dateObj.toLocaleDateString('en-IN', options);
             
             const tbody = document.getElementById('reportTableBody');
-            tbody.innerHTML = '<tr><td colspan="30" class="py-12 bg-white"><div class="flex flex-col items-center justify-center"><div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div><p class="mt-3 text-sm font-bold text-gray-600">Fetching device list...</p></div></td></tr>';
+            tbody.innerHTML = '<tr><td colspan="30" class="py-12 bg-white"><div class="flex flex-col items-center justify-center"><div class="w-10 h-10 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin"></div><p class="mt-3 text-sm font-bold text-gray-600">Loading cached report...</p></div></td></tr>';
+
+            // Reports are built from telemetry continuously stored by ws_collector.js.
+            // This is one fast request instead of waiting for every device over WS.
+            const reportUrl = `api_reports.php?type=${encodeURIComponent(type)}&date=${encodeURIComponent(selectedDate)}&plant=${encodeURIComponent(plantId)}`;
+            fetch(reportUrl, { cache: 'no-store' })
+                .then(response => {
+                    if (!response.ok) throw new Error(`Report HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then(result => {
+                    if (!result.success) throw new Error(result.error || 'Report request failed');
+                    const rows = result.data || [];
+                    const invNames = result.meta?.inv_names || [];
+                    lastReportData = { type, data: rows, meta: { inv_names: invNames } };
+                    renderReportData(type, rows, invNames);
+                    updateLiveStatus();
+                })
+                .catch(error => {
+                    console.error('[Reports] Fast report failed:', error);
+                    tbody.innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
+                });
+            return;
 
             // Reset data collection
             pendingReportRequest = true;

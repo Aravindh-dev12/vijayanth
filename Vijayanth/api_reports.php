@@ -1,128 +1,86 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 0);
 require 'config.php';
 header('Content-Type: application/json');
+header('Cache-Control: private, max-age=10, stale-while-revalidate=30');
 date_default_timezone_set('Asia/Kolkata');
 
-$headers = getallheaders();
-$auth = isset($headers['Authorization']) ? $headers['Authorization'] : (isset($headers['authorization']) ? $headers['authorization'] : '');
-$userRole = ''; $userPlant = '';
-if ($auth && preg_match('/Bearer\s+(\S+)/', $auth, $m)) {
-    $token = $conn->real_escape_string($m[1]);
-    $res = $conn->query("SELECT role, plant_id FROM users WHERE auth_token = '$token' LIMIT 1");
-    if ($res && $res->num_rows > 0) { $u = $res->fetch_assoc(); $userRole = $u['role']; $userPlant = $u['plant_id']; }
+$type = ($_GET['type'] ?? 'daily') === 'monthly' ? 'monthly' : 'daily';
+$date = trim((string)($_GET['date'] ?? date('Y-m-d')));
+$plant = strtolower(trim((string)($_GET['plant'] ?? getDefaultPlantId())));
+
+if (!isset($PLANTS[$plant])) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid plant.', 'data' => []]);
+    exit;
 }
-if (empty($userRole)) {
-    $urlToken = isset($_GET['token']) ? $conn->real_escape_string($_GET['token']) : '';
-    if ($urlToken) {
-        $res = $conn->query("SELECT role, plant_id FROM users WHERE auth_token = '$urlToken' LIMIT 1");
-        if ($res && $res->num_rows > 0) { $u = $res->fetch_assoc(); $userRole = $u['role']; $userPlant = $u['plant_id']; }
-    }
+if (($type === 'daily' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) ||
+    ($type === 'monthly' && !preg_match('/^\d{4}-\d{2}$/', $date))) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'Invalid report date.', 'data' => []]);
+    exit;
 }
 
-$tab = isset($_GET['tab']) ? $conn->real_escape_string($_GET['tab']) : 'inv_vcb';
-$type = isset($_GET['type']) ? $conn->real_escape_string($_GET['type']) : 'daily';
-$date = isset($_GET['date']) ? $conn->real_escape_string($_GET['date']) : date('Y-m-d');
-$plant = isset($_GET['plant']) ? trim($conn->real_escape_string($_GET['plant'])) : '';
+$conn = getPlantDbConn($plant);
+if (!$conn) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'error' => 'Database connection failed.', 'data' => []]);
+    exit;
+}
 
-if ($userRole && $userRole !== 'admin') { if ($plant !== $userPlant) $plant = $userPlant; }
-if (empty($plant)) $plant = 'vijayanth';
+$escPlant = $conn->real_escape_string($plant);
+$escDate = $conn->real_escape_string($date);
+$periodSql = $type === 'daily'
+    ? "snapshot_at >= '{$escDate} 00:00:00' AND snapshot_at <= '{$escDate} 23:59:59'"
+    : "snapshot_at >= '{$escDate}-01 00:00:00' AND snapshot_at < DATE_ADD('{$escDate}-01 00:00:00', INTERVAL 1 MONTH)";
+$bucketSql = $type === 'daily'
+    ? "DATE_FORMAT(snapshot_at, '%H:00')"
+    : "DATE_FORMAT(snapshot_at, '%d-%m-%Y')";
 
-try {
-class SimpleWSClient {
-    private $socket;
-    public function connect($host, $port) {
-        $this->socket = @fsockopen($host, $port, $errno, $errstr, 3);
-        if (!$this->socket) return false;
-        stream_set_timeout($this->socket, 10);
-        stream_set_blocking($this->socket, false);
-        $key = base64_encode(random_bytes(16));
-        $headers = "GET / HTTP/1.1\r\nHost: {$host}:{$port}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: $key\r\nSec-WebSocket-Version: 13\r\n\r\n";
-        fwrite($this->socket, $headers);
-        $response = ''; $start = time();
-        while (time() - $start < 3) {
-            $line = fgets($this->socket);
-            if ($line === false) { usleep(10000); continue; }
-            $response .= $line;
-            if ($line === "\r\n") break;
+$sql = "SELECT {$bucketSql} AS time_label, inverter_name,
+               MAX(daily_gen_kwh) AS generation_kwh,
+               MAX(power_kw) AS power_kw,
+               MAX(ambient_temp) AS ambient_temp
+        FROM inverter_data
+        WHERE plant_id = '{$escPlant}' AND {$periodSql}
+        GROUP BY time_label, inverter_name
+        ORDER BY MIN(snapshot_at), inverter_name";
+$result = @$conn->query($sql);
+$byBucket = [];
+$names = [];
+if ($result) {
+    while ($row = $result->fetch_assoc()) {
+        if ($type === 'daily') {
+            $hour = (int)substr($row['time_label'], 0, 2);
+            if ($hour < 6 || $hour > 18) continue;
         }
-        return strpos($response, '101') !== false;
+        $name = (string)$row['inverter_name'];
+        $names[$name] = true;
+        $byBucket[$row['time_label']][$name] = (float)$row['generation_kwh'];
     }
-    public function sendText($payload) {
-        $len = strlen($payload); $frame = chr(0x81); $mask = random_bytes(4);
-        if ($len <= 125) $frame .= chr(0x80 | $len);
-        elseif ($len <= 65535) { $frame .= chr(0x80 | 126) . pack('n', $len); }
-        else { $frame .= chr(0x80 | 127) . pack('NN', 0, $len); }
-        $frame .= $mask;
-        for ($i = 0; $i < $len; $i++) $frame .= $payload[$i] ^ $mask[$i % 4];
-        fwrite($this->socket, $frame);
+}
+$conn->close();
+
+$invNames = array_keys($names);
+usort($invNames, function($a, $b) {
+    preg_match('/\d+/', $a, $ma); preg_match('/\d+/', $b, $mb);
+    return ((int)($ma[0] ?? 0)) <=> ((int)($mb[0] ?? 0));
+});
+$rows = [];
+foreach ($byBucket as $label => $values) {
+    $row = ['time_label' => $label];
+    $total = 0;
+    foreach ($invNames as $i => $name) {
+        $value = (float)($values[$name] ?? 0);
+        $row['inv' . ($i + 1) . '_kwh'] = $value;
+        $total += $value;
     }
-    public function readFrame() {
-        $data = $this->readExactly(2);
-        if (!$data || strlen($data) < 2) return null;
-        $byte1 = ord($data[0]); $byte2 = ord($data[1]);
-        $opcode = $byte1 & 0x0F; $len = $byte2 & 0x7F;
-        if ($len === 126) { $ext = $this->readExactly(2); if (!$ext) return null; $len = unpack('n', $ext)[1]; }
-        elseif ($len === 127) { $ext = $this->readExactly(8); if (!$ext) return null; $u = unpack('N2', $ext); $len = ($u[1] << 32) | $u[2]; }
-        $masked = ($byte2 >> 7) & 0x01;
-        if ($masked) { $mask = $this->readExactly(4); if (!$mask) return null; }
-        $payload = ''; if ($len > 0) { $payload = $this->readExactly($len); if (!$payload) return null; }
-        if (!empty($mask)) for ($i = 0; $i < $len; $i++) $payload[$i] = $payload[$i] ^ $mask[$i % 4];
-        if ($opcode === 0x08) return ['opcode' => 'close', 'payload' => $payload];
-        if ($opcode === 0x09) { $this->sendPong($payload); return ['opcode' => 'ping', 'payload' => '']; }
-        if ($opcode === 0x0A) return ['opcode' => 'pong', 'payload' => ''];
-        return ['opcode' => 'text', 'payload' => $payload];
-    }
-    private function readExactly($n) {
-        $buffer = ''; $start = time();
-        while (strlen($buffer) < $n && time() - $start < 2) {
-            $chunk = @fread($this->socket, $n - strlen($buffer));
-            if ($chunk === false || $chunk === '') { if (feof($this->socket)) return null; usleep(1000); continue; }
-            $buffer .= $chunk;
-        }
-        return strlen($buffer) === $n ? $buffer : null;
-    }
-    private function sendPong($payload) {
-        $len = strlen($payload); $frame = chr(0x8A); $mask = random_bytes(4);
-        if ($len <= 125) $frame .= chr(0x80 | $len) . $mask;
-        else { $frame .= chr(0x80 | 126) . pack('n', $len) . $mask; }
-        for ($i = 0; $i < $len; $i++) $frame .= $payload[$i] ^ $mask[$i % 4];
-        fwrite($this->socket, $frame);
-    }
-    public function close() { if ($this->socket) { fclose($this->socket); $this->socket = null; } }
+    $row['inv_total_kwh'] = $total;
+    $rows[] = $row;
 }
 
-// Map plant IDs to unit IDs
-$plantMap = [
-    'vijayanth' => 'via-1mw',
-    'krishna' => 'via-3mw'
-];
-$unitId = $plantMap[$plant] ?? 'via-1mw';
-
-$response = [
-    "success" => false,
-    "error" => "WebSocket reports not yet implemented for Vijayanth - use live WebSocket connection in browser",
-    "meta" => [
-        "tab" => $tab,
-        "type" => $type,
-        "date" => $date,
-        "plant" => $plant,
-        "unit_id" => $unitId,
-        "source" => "not_available",
-        "message" => "This API is a placeholder. Reports for Vijayanth must be fetched via WebSocket in the browser."
-    ],
-    "data" => []
-];
-
-echo json_encode($response);
-
-} catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode([
-        "success" => false,
-        "error" => "Server error: " . $e->getMessage(),
-        "data" => []
-    ]);
-}
+echo json_encode([
+    'success' => true,
+    'meta' => ['type' => $type, 'date' => $date, 'plant' => $plant, 'inv_names' => $invNames, 'source' => 'database_cache'],
+    'data' => $rows
+], JSON_UNESCAPED_SLASHES);
 ?>

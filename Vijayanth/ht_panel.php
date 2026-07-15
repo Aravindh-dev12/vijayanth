@@ -615,7 +615,7 @@ $htFirstInvX = $htMainCenterX - (($htInverterCount - 1) * $htInvSpacing / 2);
         }
 
         function loadLatestSnapshot() {
-            fetch(`api.php?action=get_fast_snapshot&plant_id=${encodeURIComponent(currentPlant)}`, { cache: 'no-store' })
+            window.LiveWsStore.fastSnapshot(currentPlant)
                 .then(res => res.json())
                 .then(res => {
                     if (res.status !== 'success' || !res.data) return;

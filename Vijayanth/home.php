@@ -7,6 +7,7 @@
     <title id="pageTitle">Solar Plant – Home</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="assets/live_ws_store.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -660,6 +661,42 @@
                 setTimeout(connectWS, 5000); 
             };
         }
+        function loadLatestSnapshot() {
+            window.LiveWsStore.fastSnapshot(currentPlant)
+                .then(response => response.json())
+                .then(snapshot => {
+                    if (!snapshot || snapshot.status !== 'success' || !snapshot.data) return;
+                    (snapshot.data.inverters || []).forEach(row => {
+                        const name = canonicalInverterName(row.inverter_name);
+                        invData[name] = Object.assign({}, invData[name] || {}, {
+                            power: parseFloat(row.power_kw) || 0,
+                            reactive: parseFloat(row.reactive_kvar) || 0,
+                            pf: parseFloat(row.power_factor) || 0,
+                            freq: parseFloat(row.frequency_hz) || 0,
+                            acCurrent: ([row.current_a, row.current_b, row.current_c].reduce((s, v) => s + (parseFloat(v) || 0), 0) / 3),
+                            acVoltage: parseFloat(row.vac_ab) || 0,
+                            dailyGen: parseFloat(row.daily_gen_kwh) || 0,
+                            totalGen: parseFloat(row.total_gen_kwh) || 0,
+                            dailyCO2: parseFloat(row.daily_co2_kg) || 0,
+                            totalCO2: parseFloat(row.total_co2_kg) || 0,
+                            activeStr: parseInt(row.active_strings, 10) || 0,
+                            totalStr: parseInt(row.total_strings, 10) || 0,
+                            strings: Array.isArray(row.strings) ? row.strings.map(s => ({
+                                n: parseInt(s.n ?? s.string_n, 10) || 0,
+                                curr: parseFloat(s.curr ?? s.current_a) || 0,
+                                volt: parseFloat(s.volt ?? s.voltage_v) || 0,
+                                active: String(s.active) === '1' || s.active === true
+                            })) : []
+                        });
+                    });
+                    if (snapshot.data.vcb) state.vcbPower = parseFloat(snapshot.data.vcb.power_3phase_kw) || 0;
+                    state.dailyEnergy = Object.values(invData).reduce((sum, inv) => sum + (inv.dailyGen || 0), 0);
+                    updateDash();
+                })
+                .catch(() => {});
+        }
+
+        loadLatestSnapshot();
         connectWS();
     </script>
 </body>

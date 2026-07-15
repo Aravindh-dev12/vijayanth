@@ -492,6 +492,12 @@ elseif ($action === 'get_fast_snapshot') {
         echo json_encode(["status" => "error", "message" => "Invalid plant_id."]);
         exit;
     }
+    $cachedSnapshot = readPlantSnapshotCache($plant_id, 300);
+    if ($cachedSnapshot) {
+        header('X-Plant-Cache: HIT');
+        echo json_encode($cachedSnapshot, JSON_UNESCAPED_SLASHES);
+        exit;
+    }
     $conn = getPlantDbConn($plant_id);
     if (!$conn) {
         echo json_encode(["status" => "error", "message" => "Database connection failed."]);

@@ -222,6 +222,32 @@
     }
 
     window.LiveWsStore = {
+        fastSnapshot(plantId) {
+            const key = `vs_fast_snapshot_${plantId}`;
+            let cached = null;
+            try { cached = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) {}
+
+            const request = fetch(`api.php?action=get_fast_snapshot&plant_id=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
+                .then((response) => {
+                    if (!response.ok) throw new Error(`Snapshot HTTP ${response.status}`);
+                    return response.json();
+                })
+                .then((json) => {
+                    if (json && json.status === 'success') {
+                        try { sessionStorage.setItem(key, JSON.stringify(json)); } catch (e) {}
+                        window.dispatchEvent(new CustomEvent('plant-fast-snapshot', { detail: { plantId, snapshot: json } }));
+                    }
+                    return json;
+                });
+
+            // Navigation between pages renders the last snapshot synchronously;
+            // the live socket and background request then replace it with fresh data.
+            if (cached && cached.status === 'success') {
+                request.catch(() => {});
+                return Promise.resolve({ ok: true, json: () => Promise.resolve(cached) });
+            }
+            return request.then((json) => ({ ok: true, json: () => Promise.resolve(json) }));
+        },
         todayLocal() {
             const d = new Date();
             const y = d.getFullYear();

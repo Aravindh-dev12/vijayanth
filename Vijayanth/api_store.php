@@ -65,6 +65,12 @@ if ($stmtLatest) {
     $stmtLatest->close();
 }
 
+// Keep an atomic file snapshot updated by the continuous collector. Pages can
+// serve this immediately without opening a database connection.
+if (in_array($type, ['inverter', 'vcb', 'transformer'], true)) {
+    updatePlantSnapshotCache($plant_id, $type, $device_name, $payload, $snapshot_at);
+}
+
 $success = false;
 $errorMsg = '';
 
