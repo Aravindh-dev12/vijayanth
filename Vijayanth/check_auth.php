@@ -1,23 +1,21 @@
 <?php
 require 'config.php';
 session_start();
-if (!isset($_SESSION['user']) && basename($_SERVER['SCRIPT_NAME']) === 'admin.php') {
+if (!isset($_SESSION['user']) || !is_array($_SESSION['user'])) {
     header('Location: index.php');
     exit;
 }
-$user = $_SESSION['user'] ?? [
-    'email' => '',
-    'role' => 'viewer',
-    'plant_id' => ''
-];
+$user = $_SESSION['user'];
 
-
-if (isset($_GET['plant']) && !empty($_GET['plant']) && isset($PLANTS[$_GET['plant']])) {
+// Plant users are always locked to their assigned plant. Only administrators
+// may select a different configured plant through the URL.
+if (($user['role'] ?? 'user') !== 'admin') {
+    $assignedPlant = strtolower((string)($user['plant_id'] ?? ''));
+    $currentPlant = isset($PLANTS[$assignedPlant]) ? $assignedPlant : getDefaultPlantId();
+} elseif (isset($_GET['plant']) && isset($PLANTS[$_GET['plant']])) {
     $currentPlant = $_GET['plant'];
-} elseif ($user['role'] !== 'admin' && !empty($user['plant_id']) && isset($PLANTS[$user['plant_id']])) {
-    $currentPlant = $user['plant_id']; // non-admin user → their own plant
 } else {
-    $currentPlant = getDefaultPlantId(); // admin / fallback
+    $currentPlant = getDefaultPlantId();
 }
 
 // Validate the plant exists in config (safety)
@@ -25,7 +23,7 @@ if (!isset($PLANTS[$currentPlant])) {
     $currentPlant = getDefaultPlantId();
 }
 
-if (basename($_SERVER['SCRIPT_NAME']) === 'admin.php' && $user['role'] !== 'admin' && !empty($user['plant_id']) && $currentPlant !== $user['plant_id']) {
+if (basename($_SERVER['SCRIPT_NAME']) === 'admin.php' && ($user['role'] ?? '') !== 'admin') {
     header('Location: overview.php?plant=' . urlencode($user['plant_id']));
     exit;
 }

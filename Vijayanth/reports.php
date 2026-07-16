@@ -45,7 +45,7 @@
                 <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm">
                     <i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>
                 </button>
-                <button onclick="downloadJson()" id="dlBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm opacity-50 cursor-not-allowed" disabled>
+                <button onclick="generateAndExportJSON()" id="dlBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm opacity-50 cursor-not-allowed" disabled>
                     <i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>
                 </button>
             </div>
@@ -132,6 +132,7 @@
         let analyticsReceived = new Set();
         let analyticsRequestToken = 0;
         let exportAfterGenerate = false;
+        let jsonAfterGenerate = false;
         
         const dateInput = document.getElementById('dateSelect');
         const monthInput = document.getElementById('monthSelect');
@@ -188,6 +189,17 @@
             if (button) {
                 button.disabled = true;
                 button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+            }
+            generateReportData();
+            startAutoRefresh();
+        }
+
+        function generateAndExportJSON() {
+            jsonAfterGenerate = true;
+            const button = document.getElementById('dlBtn');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="hidden sm:inline">Generating...</span>';
             }
             generateReportData();
             startAutoRefresh();
@@ -685,6 +697,10 @@
                 exportAfterGenerate = false;
                 setTimeout(exportToPDF, 150);
             }
+            if (jsonAfterGenerate) {
+                jsonAfterGenerate = false;
+                setTimeout(downloadJson, 50);
+            }
         }
 
         function generateReportData() {
@@ -769,10 +785,16 @@
                 .catch(error => {
                     document.getElementById('reportTableBody').innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
                     exportAfterGenerate = false;
+                    jsonAfterGenerate = false;
                     const button = document.getElementById('generatePdfBtn');
                     if (button) {
                         button.disabled = false;
                         button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                    }
+                    const jsonButton = document.getElementById('dlBtn');
+                    if (jsonButton) {
+                        jsonButton.disabled = false;
+                        jsonButton.innerHTML = '<i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>';
                     }
                 });
         }
@@ -893,6 +915,10 @@
                 plant_name: plant.name,
                 report_type: type,
                 date: date,
+                generated_at: new Date().toISOString(),
+                source: lastReportData.meta?.source || 'vinoba_universal_analytics',
+                interval_minutes: lastReportData.meta?.period_minutes || 30,
+                operating_window: type === 'daily' ? { start: '06:00', end: '19:00' } : null,
                 columns: columns,
                 rows: exportRows,
                 totals: exportTotals
@@ -903,6 +929,12 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = filename;
             document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            const button = document.getElementById('dlBtn');
+            if (button) {
+                button.disabled = false;
+                button.classList.remove('opacity-50','cursor-not-allowed');
+                button.innerHTML = '<i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>';
+            }
         }
 
         loadSidebar();

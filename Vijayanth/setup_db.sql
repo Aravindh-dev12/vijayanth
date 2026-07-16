@@ -237,15 +237,7 @@ DELIMITER ;
 
 SET @snapshot = '2026-06-23 10:00:00';
 
-DELETE FROM users WHERE email IN (
-    'admin@vijayanth.com',
-    'bojaraj@scada.com',
-    'krishna@scada.com'
-);
-
-INSERT INTO users (email, password, role, plant_id) VALUES
-('admin@vijayanth.com',    '$2y$10$gtH5saiioG4QGq5sPk9ZAeXC2l4h.GAA8zUxDvsqoGVSojH90JJ6W', 'admin', ''),
-('bojaraj@scada.com',   '$2y$10$GmquwncgTSdPn/nd5w68mOMg.gXfZjLYKP8/e3bPi1Ck0mesSNsh2', 'user', 'vijayanth'),
-('krishna@scada.com',     '$2y$10$VmFnq29pFFmmQ6lPxJqVKuxcbjR7WQJCHb/g1loHk7sXDjt8KiNTu', 'user', 'krishna');
+-- Create/update login accounts after setup by running provision_login_users.php
+-- with the three password environment variables set on the local server.
 
 -- Live telemetry is inserted by api_store.php. No demo plant data is seeded.

@@ -77,11 +77,9 @@
 
         <div class="border-t border-slate-200 my-0.5 sidebar-text"></div>
 
-        <div class="flex items-center justify-center gap-1.5 sidebar-text">
-            <div class="flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest text-gray-500 whitespace-nowrap">
-                <span>Powered by</span>
-                <img src="assets/nuclei-tech-icon.png" alt="" class="h-5 w-5 object-contain">
-                <span class="text-emerald-700">Nuclei Tech</span>
+        <div class="flex items-center justify-center sidebar-text">
+            <div class="text-[9px] font-black uppercase tracking-wide text-gray-500 text-center">
+                Powered by <span class="text-emerald-700">Oriks Energy Private Care</span>
             </div>
         </div>
     </div>
@@ -90,13 +88,18 @@
 <script>
     function initSidebar() {
         const params = new URLSearchParams(window.location.search);
-        // Priority: URL ?plant= param → sessionStorage (tab-local) → default
-        const plant = params.get('plant')
+        let storedUser = {};
+        try { storedUser = JSON.parse(sessionStorage.getItem('vs_user') || '{}'); } catch (e) {}
+        const assignedPlant = storedUser.role && storedUser.role !== 'admin' ? storedUser.plant_id : '';
+        // Plant accounts cannot be switched with a URL. Admins may select either plant.
+        const plant = assignedPlant
+            || params.get('plant')
             || sessionStorage.getItem('vs_current_plant')
             || 'vijayanth';
         // Store in sessionStorage (tab-specific) NOT localStorage to keep tabs isolated
         sessionStorage.setItem('vs_current_plant', plant);
         const plantNames = {
+            'vijayanth': 'Bojaraj Textiles Pvt Ltd',
             'bojaraj': 'Bojaraj Textiles Pvt Ltd',
             'krishna': 'Krishna poultry farm'
         };
@@ -107,7 +110,6 @@
 
         const adminBack = document.getElementById('adminBackDashboard');
         try {
-            const storedUser = JSON.parse(sessionStorage.getItem('vs_user') || '{}');
             if (adminBack && storedUser.role === 'admin') {
                 adminBack.classList.remove('hidden');
                 adminBack.classList.add('flex');

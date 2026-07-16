@@ -1,5 +1,10 @@
 <?php
-echo "-- admin123\n" . password_hash('admin123', PASSWORD_DEFAULT) . "\n\n";
-echo "-- bojaraj123\n" . password_hash('bojaraj123', PASSWORD_DEFAULT) . "\n\n";
-echo "-- krishna123\n" . password_hash('krishna123', PASSWORD_DEFAULT) . "\n\n";
+// CLI helper: php gen_hashes.php "password-one" "password-two"
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit;
+}
+foreach (array_slice($argv, 1) as $password) {
+    echo password_hash($password, PASSWORD_DEFAULT) . PHP_EOL;
+}
 ?>

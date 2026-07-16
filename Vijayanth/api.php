@@ -105,7 +105,7 @@ if ($action === 'login') {
     // Map email to plant ID
     $emailToPlant = [
         'admin@vijayanth.com' => getDefaultPlantId(),
-        'bojaraj@scada.com' => 'bojaraj',
+        'bojaraj@scada.com' => 'vijayanth',
         'krishna@scada.com' => 'krishna'
     ];
     
@@ -151,12 +151,13 @@ if ($action === 'login') {
         exit;
     }
 
-    if (password_verify($pass, $foundUser['password']) || $pass === $foundUser['password'] || $pass === '') {
+    if (password_verify($pass, $foundUser['password'])) {
         $token = bin2hex(random_bytes(32));
         $uid = (int)$foundUser['id'];
         $foundConn->query("UPDATE users SET auth_token = '$token', plant_id = '$foundPlant' WHERE id = $uid");
         $foundConn->close();
 
+        $foundUser['plant_id'] = $foundPlant;
         $_SESSION['user'] = $foundUser;
         $_SESSION['plant_id'] = $foundPlant;
         

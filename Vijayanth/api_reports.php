@@ -1,5 +1,6 @@
 <?php
 require 'config.php';
+session_start();
 header('Content-Type: application/json');
 header('Cache-Control: private, max-age=10, stale-while-revalidate=30');
 date_default_timezone_set('Asia/Kolkata');
@@ -7,6 +8,16 @@ date_default_timezone_set('Asia/Kolkata');
 $type = ($_GET['type'] ?? 'daily') === 'monthly' ? 'monthly' : 'daily';
 $date = trim((string)($_GET['date'] ?? date('Y-m-d')));
 $plant = strtolower(trim((string)($_GET['plant'] ?? getDefaultPlantId())));
+
+$reportUser = isset($_SESSION['user']) && is_array($_SESSION['user']) ? $_SESSION['user'] : null;
+if (!$reportUser) {
+    http_response_code(401);
+    echo json_encode(['success' => false, 'error' => 'Authentication required.', 'data' => []]);
+    exit;
+}
+if (($reportUser['role'] ?? 'user') !== 'admin') {
+    $plant = strtolower((string)($reportUser['plant_id'] ?? getDefaultPlantId()));
+}
 
 if (!isset($PLANTS[$plant])) {
     http_response_code(400);
