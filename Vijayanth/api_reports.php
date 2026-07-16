@@ -52,7 +52,7 @@ if ($result) {
         if ($type === 'daily') {
             $hour = (int)substr($row['time_label'], 0, 2);
             $minute = (int)substr($row['time_label'], 3, 2);
-            if ($hour < 6 || $hour > 18 || ($hour === 18 && $minute > 30)) continue;
+            if ($hour < 6 || $hour > 19 || ($hour === 19 && $minute > 0)) continue;
         }
         $name = (string)$row['inverter_name'];
         $names[$name] = true;
@@ -71,7 +71,7 @@ usort($invNames, function($a, $b) {
 $orderedBuckets = $byBucket;
 if ($type === 'daily') {
     $orderedBuckets = [];
-    for ($minutes = 6 * 60; $minutes <= 18 * 60 + 30; $minutes += 30) {
+    for ($minutes = 6 * 60; $minutes <= 19 * 60; $minutes += 30) {
         $label = sprintf('%02d:%02d', intdiv($minutes, 60), $minutes % 60);
         $orderedBuckets[$label] = $byBucket[$label] ?? [];
     }

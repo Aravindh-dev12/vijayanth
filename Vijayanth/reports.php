@@ -14,9 +14,9 @@
         body { font-family: 'Inter', sans-serif; }
         .report-table { table-layout: fixed; min-width: 1200px; width: 100%; border-collapse: collapse; }
         .table-hscroll { overflow-x: auto; overflow-y: visible; }
-        .report-table th, .report-table td { padding: 4px 2px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
-        .report-table td { font-size: 11px; color: #334155; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
-        .report-table th { color: #475569; font-weight: 600; font-size: 9px; text-transform: uppercase; letter-spacing: 0; border-bottom: 2px solid #e2e8f0; line-height: 1.1; }
+        .report-table th, .report-table td { padding: 9px 7px; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+        .report-table td { font-size: 13px; color: #334155; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
+        .report-table th { color: #334155; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .01em; border-bottom: 2px solid #cbd5e1; line-height: 1.25; }
         .report-table tbody tr { transition: background-color 0.2s ease; background-color: #ffffff; }
         .report-table tbody tr:hover { background-color: #f8fafc !important; }
         .table-hscroll::-webkit-scrollbar { height: 10px; }
@@ -67,8 +67,8 @@
                     </select>
                     <input type="date" id="dateSelect" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-gray-50 font-medium">
                     <input type="month" id="monthSelect" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-gray-50 font-medium hidden">
-                    <button onclick="generateReportData(); startAutoRefresh();" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-eye"></i> View
+                    <button id="generatePdfBtn" onclick="generateAndExportPDF();" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-file-pdf"></i> Generate PDF
                     </button>
                 </div>
             </div>
@@ -131,6 +131,7 @@
         let analyticsDataByDevice = {};
         let analyticsReceived = new Set();
         let analyticsRequestToken = 0;
+        let exportAfterGenerate = false;
         
         const dateInput = document.getElementById('dateSelect');
         const monthInput = document.getElementById('monthSelect');
@@ -178,7 +179,18 @@
 
         function startAutoRefresh() {
             if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(() => { generateReportData(); }, 30000);
+            refreshInterval = setInterval(() => { if (!pendingReportRequest) generateReportData(); }, 30000);
+        }
+
+        function generateAndExportPDF() {
+            exportAfterGenerate = true;
+            const button = document.getElementById('generatePdfBtn');
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+            }
+            generateReportData();
+            startAutoRefresh();
         }
 
         function stopAutoRefresh() {
@@ -326,7 +338,7 @@
                 startDate: range.startDate,
                 endDate: range.endDate,
                 startTime: '06:00',
-                endTime: '18:30',
+                endTime: '19:00',
                 timePeriod: '30',
                 method: 'last'
             })));
@@ -377,7 +389,7 @@
                 // Always show the complete solar operating window, including
                 // empty intervals, so a delayed or missing inverter response
                 // cannot remove a row from the report.
-                for (let minutes = 6 * 60; minutes <= 18 * 60 + 30; minutes += 30) {
+                for (let minutes = 6 * 60; minutes <= 19 * 60; minutes += 30) {
                     const hour = Math.floor(minutes / 60);
                     const minute = minutes % 60;
                     const label = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
@@ -394,7 +406,7 @@
                     const hour = Number(match[4] || 0);
                     const minute = Number(match[5] || 0);
                     const totalMinutes = hour * 60 + minute;
-                    if (type === 'daily' && (totalMinutes < 6 * 60 || totalMinutes > 18 * 60 + 30)) return;
+                    if (type === 'daily' && (totalMinutes < 6 * 60 || totalMinutes > 19 * 60)) return;
                     const bucketMinute = minute < 30 ? 0 : 30;
                     const label = type === 'daily'
                         ? `${String(hour).padStart(2, '0')}:${String(bucketMinute).padStart(2, '0')}`
@@ -418,7 +430,7 @@
             pendingReportRequest = false;
             if (wsReportTimeout) { clearTimeout(wsReportTimeout); wsReportTimeout = null; }
             if (!rows.length) return loadCachedReport('Universal Analytics returned no rows');
-            lastReportData = { type, data: rows, meta: { inv_names: invNames, source: 'vinoba_universal_analytics', method: 'last', period_minutes: 30, start_time: '06:00', end_time: '18:30' } };
+            lastReportData = { type, data: rows, meta: { inv_names: invNames, source: 'vinoba_universal_analytics', method: 'last', period_minutes: 30, start_time: '06:00', end_time: '19:00' } };
             renderReportData(type, rows, invNames);
         }
         
@@ -592,9 +604,9 @@
         function renderTableHeaders(type, invNames) {
             const thead = document.querySelector('.report-table thead');
             const n = invNames.length;
-            const timeW = 90;
-            const invW  = 110;
-            const totW  = 120;
+            const timeW = 115;
+            const invW  = 135;
+            const totW  = 155;
             let totalW = timeW + n * invW + totW;
 
             let topRow = `<th rowspan="2" style="width:${timeW}px;min-width:${timeW}px;">${type==='daily'?'Time':'Date'}</th>`;
@@ -669,6 +681,10 @@
             updateLiveStatus();
             document.getElementById('dlBtn').disabled = false;
             document.getElementById('dlBtn').classList.remove('opacity-50','cursor-not-allowed');
+            if (exportAfterGenerate) {
+                exportAfterGenerate = false;
+                setTimeout(exportToPDF, 150);
+            }
         }
 
         function generateReportData() {
@@ -752,6 +768,12 @@
                 })
                 .catch(error => {
                     document.getElementById('reportTableBody').innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
+                    exportAfterGenerate = false;
+                    const button = document.getElementById('generatePdfBtn');
+                    if (button) {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                    }
                 });
         }
 
@@ -784,7 +806,21 @@
                 html2canvas: { scale: 2, useCORS: true, width: tableWidth + 40, windowWidth: tableWidth + 100, scrollX: 0, scrollY: 0 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
             };
-            html2pdf().set(opt).from(clone).save().then(() => { document.body.removeChild(clone); });
+            html2pdf().set(opt).from(clone).save().then(() => {
+                document.body.removeChild(clone);
+                const button = document.getElementById('generatePdfBtn');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                }
+            }).catch(() => {
+                document.body.removeChild(clone);
+                const button = document.getElementById('generatePdfBtn');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                }
+            });
         }
 
         function downloadJson() {

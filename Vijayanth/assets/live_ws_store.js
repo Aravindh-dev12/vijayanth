@@ -207,9 +207,45 @@
         return true;
     }
 
+    function cacheLivePayload(plantId, type, deviceName, payload) {
+        try {
+            const key = `vs_fast_snapshot_${plantId}`;
+            const snapshot = JSON.parse(localStorage.getItem(key) || 'null') || {
+                status: 'success', plant_id: plantId, data: { vcb: null, inverters: [], transformers: [] }
+            };
+            snapshot.status = 'success';
+            snapshot.plant_id = plantId;
+            snapshot._cached_at = Date.now();
+            snapshot.data = snapshot.data || { vcb: null, inverters: [], transformers: [] };
+            if (type === 'inverter') {
+                const row = {
+                    plant_id: plantId, inverter_name: deviceName, snapshot_at: new Date().toISOString(),
+                    power_kw: payload.power, reactive_kvar: payload.reactive, power_factor: payload.pf,
+                    vac_ab: payload.vac_ab, vac_bc: payload.vac_bc, vac_ca: payload.vac_ca,
+                    frequency_hz: payload.freq, current_a: payload.i_a, current_b: payload.i_b, current_c: payload.i_c,
+                    efficiency: payload.eff, ambient_temp: payload.amb, daily_gen_kwh: payload.dailyGen,
+                    total_gen_kwh: payload.totalGen, daily_co2_kg: payload.dailyCO2, total_co2_kg: payload.totalCO2,
+                    daily_hours: payload.dailyHrs, total_hours: payload.totalHrs, active_strings: payload.activeStr,
+                    total_strings: payload.totalStr, has_alarm: payload.hasAlarm ? 1 : 0, has_fault: payload.hasFault ? 1 : 0,
+                    fault_code: payload.faultCode || '', work_state: payload.workState || '', status_text: payload.statusText || '',
+                    strings: (payload.strings || []).map(s => ({ string_n: s.n, current_a: s.curr, voltage_v: s.volt, active: s.active ? 1 : 0 }))
+                };
+                const rows = Array.isArray(snapshot.data.inverters) ? snapshot.data.inverters : [];
+                const index = rows.findIndex(item => canonicalInverterName(item.inverter_name) === deviceName);
+                if (index >= 0) rows[index] = row; else rows.push(row);
+                snapshot.data.inverters = rows;
+            } else if (type === 'vcb') {
+                snapshot.data.vcb = { plant_id: plantId, device_name: deviceName, snapshot_at: new Date().toISOString(), ...payload };
+            }
+            const serialized = JSON.stringify(snapshot);
+            localStorage.setItem(key, serialized);
+            sessionStorage.setItem(key, serialized);
+        } catch (e) {}
+    }
+
     function storeDataMessage(message, plantId, historicalReplay) {
         if (!message || !message.values || !plantId) return;
-        if (historicalReplay || !canStoreForPlant(plantId)) return;
+        if (historicalReplay) return;
         const task = (message.task || '').toString().toLowerCase();
         const device = (message.device || message.deviceName || message.task || 'Device').toString();
         const lowerDevice = device.toLowerCase();
@@ -217,12 +253,19 @@
 
         if (task === 'inverter' || lowerDevice.includes('inverter') || lowerDevice.includes('inv')) {
             const deviceName = canonicalInverterName(device);
+            const payload = inverterPayload(message.values, message);
+            cacheLivePayload(plantId, 'inverter', deviceName, payload);
+            if (!canStoreForPlant(plantId)) return;
             if (!historicalReplay && !shouldStore(`${plantId}:inv:${deviceName}`)) return;
-            postStore({ plant_id: plantId, device_name: deviceName, type: 'inverter', source_time: sourceTime, payload: inverterPayload(message.values, message) });
+            postStore({ plant_id: plantId, device_name: deviceName, type: 'inverter', source_time: sourceTime, payload });
         } else if (task === 'vcb' || lowerDevice.includes('vcb')) {
+            const payload = vcbPayload(message.values);
+            cacheLivePayload(plantId, 'vcb', device, payload);
+            if (!canStoreForPlant(plantId)) return;
             if (!historicalReplay && !shouldStore(`${plantId}:vcb:${device}`)) return;
-            postStore({ plant_id: plantId, device_name: device, type: 'vcb', source_time: sourceTime, payload: vcbPayload(message.values) });
+            postStore({ plant_id: plantId, device_name: device, type: 'vcb', source_time: sourceTime, payload });
         } else if (task === 'transformer' || lowerDevice.includes('transformer')) {
+            if (!canStoreForPlant(plantId)) return;
             if (!historicalReplay && !shouldStore(`${plantId}:trafo:${device}`)) return;
             postStore({ plant_id: plantId, device_name: device, type: 'transformer', source_time: sourceTime, payload: transformerPayload(device, message.values) });
         }
@@ -232,7 +275,10 @@
         fastSnapshot(plantId) {
             const key = `vs_fast_snapshot_${plantId}`;
             let cached = null;
-            try { cached = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) {}
+            try {
+                cached = JSON.parse(localStorage.getItem(key) || sessionStorage.getItem(key) || 'null');
+                if (cached && cached._cached_at && Date.now() - cached._cached_at > 300000) cached = null;
+            } catch (e) {}
 
             const request = fetch(`api.php?action=get_fast_snapshot&plant_id=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
                 .then((response) => {
@@ -241,7 +287,12 @@
                 })
                 .then((json) => {
                     if (json && json.status === 'success') {
-                        try { sessionStorage.setItem(key, JSON.stringify(json)); } catch (e) {}
+                        try {
+                            json._cached_at = Date.now();
+                            const serialized = JSON.stringify(json);
+                            localStorage.setItem(key, serialized);
+                            sessionStorage.setItem(key, serialized);
+                        } catch (e) {}
                         window.dispatchEvent(new CustomEvent('plant-fast-snapshot', { detail: { plantId, snapshot: json } }));
                     }
                     return json;
