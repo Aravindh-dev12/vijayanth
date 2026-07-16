@@ -43,11 +43,11 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
-                <button onclick="exportToPDF()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm">
+                <button id="pdfExportBtn" onclick="generateAndExportPDF()" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm">
                     <i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>
                 </button>
-                <button onclick="generateAndExportJSON()" id="dlBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm opacity-50 cursor-not-allowed" disabled>
-                    <i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>
+                <button onclick="generateAndExportExcel()" id="dlBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2 px-3 sm:px-4 rounded-lg shadow-sm transition-colors flex items-center gap-2 text-sm opacity-50 cursor-not-allowed" disabled>
+                    <i class="fa-solid fa-file-excel"></i><span class="hidden sm:inline">Excel</span>
                 </button>
             </div>
         </header>
@@ -68,8 +68,8 @@
                     </select>
                     <input type="date" id="dateSelect" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-gray-50 font-medium">
                     <input type="month" id="monthSelect" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-green-500 outline-none bg-gray-50 font-medium hidden">
-                    <button id="generatePdfBtn" onclick="generateAndExportPDF();" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-2 text-sm">
-                        <i class="fa-solid fa-file-pdf"></i> Generate PDF
+                    <button id="viewReportBtn" onclick="generateReportData(); startAutoRefresh();" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm transition flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-eye"></i> View Report
                     </button>
                 </div>
             </div>
@@ -133,7 +133,7 @@
         let analyticsReceived = new Set();
         let analyticsRequestToken = 0;
         let exportAfterGenerate = false;
-        let jsonAfterGenerate = false;
+        let excelAfterGenerate = false;
         
         const dateInput = document.getElementById('dateSelect');
         const monthInput = document.getElementById('monthSelect');
@@ -186,21 +186,21 @@
 
         function generateAndExportPDF() {
             exportAfterGenerate = true;
-            const button = document.getElementById('generatePdfBtn');
+            const button = document.getElementById('pdfExportBtn');
             if (button) {
                 button.disabled = true;
-                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating...';
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="hidden sm:inline">Generating...</span>';
             }
             generateReportData();
             startAutoRefresh();
         }
 
-        function generateAndExportJSON() {
-            jsonAfterGenerate = true;
+        function generateAndExportExcel() {
+            excelAfterGenerate = true;
             const button = document.getElementById('dlBtn');
             if (button) {
                 button.disabled = true;
-                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="hidden sm:inline">Generating...</span>';
+                button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span class="hidden sm:inline">Creating Excel...</span>';
             }
             generateReportData();
             startAutoRefresh();
@@ -698,9 +698,9 @@
                 exportAfterGenerate = false;
                 setTimeout(exportToPDF, 150);
             }
-            if (jsonAfterGenerate) {
-                jsonAfterGenerate = false;
-                setTimeout(downloadJson, 50);
+            if (excelAfterGenerate) {
+                excelAfterGenerate = false;
+                setTimeout(downloadExcel, 50);
             }
         }
 
@@ -786,16 +786,16 @@
                 .catch(error => {
                     document.getElementById('reportTableBody').innerHTML = `<tr><td colspan="30" class="py-10 text-center"><div class="text-red-500 font-bold">Unable to load report</div><div class="text-gray-400 text-xs mt-2">${error.message}</div></td></tr>`;
                     exportAfterGenerate = false;
-                    jsonAfterGenerate = false;
-                    const button = document.getElementById('generatePdfBtn');
+                    excelAfterGenerate = false;
+                    const button = document.getElementById('pdfExportBtn');
                     if (button) {
                         button.disabled = false;
-                        button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                        button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
                     }
-                    const jsonButton = document.getElementById('dlBtn');
-                    if (jsonButton) {
-                        jsonButton.disabled = false;
-                        jsonButton.innerHTML = '<i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>';
+                    const excelButton = document.getElementById('dlBtn');
+                    if (excelButton) {
+                        excelButton.disabled = false;
+                        excelButton.innerHTML = '<i class="fa-solid fa-file-excel"></i><span class="hidden sm:inline">Excel</span>';
                     }
                 });
         }
@@ -803,15 +803,24 @@
         function fmt(v) { return v !== undefined && v !== null ? Number(v).toFixed(2) : '0.00'; }
 
         function exportToPDF() {
+            if (typeof html2pdf !== 'function') {
+                document.getElementById('liveStatus').textContent = 'PDF library did not load. Refresh and try again.';
+                const button = document.getElementById('pdfExportBtn');
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
+                }
+                return;
+            }
             const element = document.getElementById('printableReport');
             const table = document.querySelector('.report-table');
             const tableWidth = table.getBoundingClientRect().width || 1200;
             const clone = element.cloneNode(true);
             clone.classList.add('pdf-mode');
-            clone.style.position = 'absolute';
+            clone.style.position = 'fixed';
             clone.style.left = '0';
             clone.style.top = '0';
-            clone.style.zIndex = '-9999';
+            clone.style.zIndex = '99999';
             clone.style.backgroundColor = '#ffffff';
             clone.style.width = (tableWidth + 40) + 'px';
             clone.style.maxWidth = 'none';
@@ -824,29 +833,31 @@
             document.body.appendChild(clone);
             const opt = {
                 margin: 10,
-                filename: 'solar_report.pdf',
+                filename: `solar_${plantSelect.value}_${document.getElementById('reportType').value === 'daily' ? dateInput.value : monthInput.value}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
                 html2canvas: { scale: 2, useCORS: true, width: tableWidth + 40, windowWidth: tableWidth + 100, scrollX: 0, scrollY: 0 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+                jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
             };
             html2pdf().set(opt).from(clone).save().then(() => {
                 document.body.removeChild(clone);
-                const button = document.getElementById('generatePdfBtn');
+                const button = document.getElementById('pdfExportBtn');
                 if (button) {
                     button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
                 }
-            }).catch(() => {
+            }).catch((error) => {
+                console.error('[Reports] PDF export failed:', error);
+                document.getElementById('liveStatus').textContent = 'PDF export failed. Please try again.';
                 document.body.removeChild(clone);
-                const button = document.getElementById('generatePdfBtn');
+                const button = document.getElementById('pdfExportBtn');
                 if (button) {
                     button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i> Generate PDF';
+                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
                 }
             });
         }
 
-        function downloadJson() {
+        function downloadExcel() {
             if (!lastReportData || !lastReportData.data) return;
             const type = document.getElementById('reportType').value;
             const date = type === 'daily' ? dateInput.value : monthInput.value;
@@ -911,22 +922,20 @@
                 exportTotals.inverters[name] = parseFloat(totInvKwh[name].toFixed(2));
             });
             
-            const exportData = {
-                plant_id: plantId,
-                plant_name: plant.name,
-                report_type: type,
-                date: date,
-                generated_at: new Date().toISOString(),
-                source: lastReportData.meta?.source || 'vinoba_universal_analytics',
-                interval_minutes: lastReportData.meta?.period_minutes || 30,
-                operating_window: type === 'daily' ? { start: '06:00', end: '19:00' } : null,
-                columns: columns,
-                rows: exportRows,
-                totals: exportTotals
-            };
-            
-            const filename = `solar_${plantId}_${date}.json`;
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]));
+            const textCell = value => `<Cell><Data ss:Type="String">${esc(value)}</Data></Cell>`;
+            const numberCell = value => `<Cell><Data ss:Type="Number">${Number(value) || 0}</Data></Cell>`;
+            let sheetRows = `<Row ss:StyleID="Title"><Cell ss:MergeAcross="${columns.length - 1}"><Data ss:Type="String">${esc(plant.name)} - Inverter Generation Report</Data></Cell></Row>`;
+            sheetRows += `<Row><Cell><Data ss:Type="String">Report</Data></Cell><Cell><Data ss:Type="String">${esc(type)}</Data></Cell><Cell><Data ss:Type="String">Date</Data></Cell><Cell><Data ss:Type="String">${esc(date)}</Data></Cell></Row>`;
+            sheetRows += `<Row ss:StyleID="Header">${columns.map(textCell).join('')}</Row>`;
+            exportRows.forEach(row => {
+                const label = row[type === 'daily' ? 'time' : 'date'];
+                sheetRows += `<Row>${textCell(label)}${invNames.map(name => numberCell(row.inverters[name])).join('')}${numberCell(row.total_generation)}</Row>`;
+            });
+            sheetRows += `<Row ss:StyleID="Total">${textCell('TOTAL')}${invNames.map(name => numberCell(exportTotals.inverters[name])).join('')}${numberCell(exportTotals.total_generation)}</Row>`;
+            const workbook = `<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Styles><Style ss:ID="Title"><Font ss:Bold="1" ss:Size="16"/></Style><Style ss:ID="Header"><Font ss:Bold="1"/><Interior ss:Color="#DDEBF7" ss:Pattern="Solid"/></Style><Style ss:ID="Total"><Font ss:Bold="1"/><Interior ss:Color="#E2F0D9" ss:Pattern="Solid"/></Style></Styles><Worksheet ss:Name="Generation Report"><Table>${sheetRows}</Table></Worksheet></Workbook>`;
+            const filename = `solar_${plantId}_${date}.xls`;
+            const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a'); a.href = url; a.download = filename;
             document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
@@ -934,7 +943,7 @@
             if (button) {
                 button.disabled = false;
                 button.classList.remove('opacity-50','cursor-not-allowed');
-                button.innerHTML = '<i class="fa-solid fa-download"></i><span class="hidden sm:inline">JSON</span>';
+                button.innerHTML = '<i class="fa-solid fa-file-excel"></i><span class="hidden sm:inline">Excel</span>';
             }
         }
 
