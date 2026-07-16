@@ -6,7 +6,7 @@ if ($user['role'] !== 'admin') {
 }
 // Use plants directly from config.php $PLANTS array - single source of truth
 $iconMap = [
-    'bojaraj' => 'fa-bolt',
+    'vijayanth' => 'fa-bolt',
     'krishna'   => 'fa-egg',
 ];
 $plants = [];
@@ -36,7 +36,7 @@ $themeClasses = [
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/responsive.css">
-    <title>Admin Dashboard - Vijayanath Solar</title>
+    <title>Vijayantha Cosmic Power Ltd - Real-Time Admin Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -80,15 +80,18 @@ $themeClasses = [
     <nav class="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6">
             <div class="flex justify-between h-14 items-center">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 min-w-0">
                     <div class="w-8 h-8 bg-blue-600 text-white rounded-md flex items-center justify-center">
                         <i class="fa-solid fa-user-shield text-sm"></i>
                     </div>
-                    <h1 class="text-lg font-bold tracking-tight text-slate-800">Admin Dashboard</h1>
+                    <div class="min-w-0 leading-tight">
+                        <h1 class="text-sm sm:text-lg font-bold tracking-tight text-slate-800 truncate">Vijayantha Cosmic Power Ltd</h1>
+                        <p class="hidden sm:block text-[10px] font-semibold text-slate-500">Real-Time Admin Dashboard</p>
+                    </div>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">Admin</span>
                 </div>
                 <div class="flex items-center gap-3">
-                    <span id="ws-status" class="text-xs font-bold text-red-500"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Disconnected</span>
+                    <span id="ws-status" class="hidden sm:inline text-xs font-bold text-amber-600"><i class="fa-solid fa-circle text-[8px] mr-1"></i>Loading cached data</span>
                     
                     <div class="h-6 w-px bg-slate-200 mx-1"></div>
                     
@@ -121,16 +124,16 @@ $themeClasses = [
                 </div>
                 <div>
                     <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Live Monitoring</div>
-                    <div class="text-sm font-bold text-slate-600">Available on each plant dashboard</div>
+                    <div id="live-plant-count" class="text-2xl font-black text-slate-800">0 / <?php echo count($plants); ?></div>
                 </div>
             </div>
             <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm flex items-center gap-4">
                 <div class="w-12 h-12 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center text-xl">
-                    <i class="fa-solid fa-users"></i>
+                    <i class="fa-solid fa-bolt"></i>
                 </div>
                 <div>
-                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">User Management</div>
-                    <div class="text-sm font-bold text-slate-600">Add plant users</div>
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Fleet Active Power</div>
+                    <div id="fleet-active-power" class="text-2xl font-black text-slate-800">0.00 kW</div>
                 </div>
             </div>
         </div>
@@ -212,6 +215,7 @@ $themeClasses = [
         </div>
     </div>
 
+    <script src="assets/live_ws_store.js"></script>
     <script>
         // Auth guard for admin page
         (function() {
@@ -241,12 +245,65 @@ $themeClasses = [
                 hasVCB: false,
                 dailyEnergy: 0,
                 inverters: {},
-                lastUpdate: '--'
+                lastUpdate: '--',
+                lastSeenAt: 0
             };
         });
 
         document.addEventListener('DOMContentLoaded', () => {
+            plants.forEach(loadFastSnapshot);
             connectWS();
+            setInterval(() => plants.forEach(p => updateUI(p.ws_unit_id)), 15000);
+        });
+
+        const numberValue = value => {
+            const parsed = parseFloat(value);
+            return Number.isFinite(parsed) ? parsed : 0;
+        };
+        const powerKw = value => {
+            const parsed = numberValue(value);
+            return Math.abs(parsed) > 10000 ? parsed / 1000 : parsed;
+        };
+        const canonicalInverterName = name => {
+            const match = String(name || '').match(/\d+/);
+            return match ? `Inverter${parseInt(match[0], 10)}` : String(name || 'Inverter');
+        };
+
+        function applySnapshot(plant, json) {
+            if (!json || json.status !== 'success' || !json.data) return;
+            const st = plantState[plant.ws_unit_id];
+            const vcb = json.data.vcb || null;
+            if (vcb) {
+                st.vcbPower = numberValue(vcb.power_3phase_kw);
+                st.hasVCB = true;
+                st.dailyEnergy = numberValue(vcb.today_energy_kwh);
+                if (vcb.snapshot_at) st.lastUpdate = new Date(vcb.snapshot_at).toLocaleTimeString();
+                const stamp = Date.parse(vcb.snapshot_at || '');
+                if (Number.isFinite(stamp)) st.lastSeenAt = Math.max(st.lastSeenAt, stamp);
+            }
+            (json.data.inverters || []).forEach(row => {
+                const name = canonicalInverterName(row.inverter_name);
+                st.inverters[name] = {
+                    active: numberValue(row.active_strings), total: numberValue(row.total_strings),
+                    power: numberValue(row.power_kw), dailyGen: numberValue(row.daily_gen_kwh)
+                };
+                const stamp = Date.parse(row.snapshot_at || '');
+                if (Number.isFinite(stamp)) st.lastSeenAt = Math.max(st.lastSeenAt, stamp);
+                if (row.snapshot_at) st.lastUpdate = new Date(row.snapshot_at).toLocaleTimeString();
+            });
+            updateUI(plant.ws_unit_id);
+        }
+
+        function loadFastSnapshot(plant) {
+            if (!window.LiveWsStore) return;
+            window.LiveWsStore.fastSnapshot(plant.id).then(response => response.json())
+                .then(json => applySnapshot(plant, json))
+                .catch(error => console.warn(`Snapshot unavailable for ${plant.id}:`, error.message));
+        }
+
+        window.addEventListener('plant-fast-snapshot', event => {
+            const plant = plants.find(p => p.id === event.detail?.plantId);
+            if (plant) applySnapshot(plant, event.detail.snapshot);
         });
 
         function updateUI(unit_id) {
@@ -260,10 +317,12 @@ $themeClasses = [
                 sumInverterPower += st.inverters[inv].power;
             }
 
-            const finalActivePower = st.hasVCB ? st.vcbPower : sumInverterPower;
+            const finalActivePower = st.vcbPower > 0 ? st.vcbPower : sumInverterPower;
+            const inverterDailyEnergy = Object.values(st.inverters).reduce((sum, inv) => sum + numberValue(inv.dailyGen), 0);
+            const finalDailyEnergy = st.dailyEnergy > 0 ? st.dailyEnergy : inverterDailyEnergy;
 
             document.getElementById(`active-${plantId}`).textContent = `${finalActivePower.toFixed(2)} kW`;
-            document.getElementById(`today-${plantId}`).textContent  = `${st.dailyEnergy.toFixed(2)} kWh`;
+            document.getElementById(`today-${plantId}`).textContent  = `${finalDailyEnergy.toFixed(2)} kWh`;
             document.getElementById(`time-${plantId}`).textContent   = st.lastUpdate;
 
             const invContainer = document.getElementById(`inverters-${plantId}`);
@@ -317,15 +376,38 @@ $themeClasses = [
             const badge = document.getElementById(`badge-${plantId}`);
             const card = document.getElementById(`card-${plantId}`);
 
-            if (finalActivePower > 0) {
+            const isFresh = st.lastSeenAt > 0 && (Date.now() - st.lastSeenAt) < 120000;
+            if (finalActivePower > 0.01) {
                 badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700";
                 badge.innerHTML = `<span class="h-2 w-2 rounded-full bg-green-500 inline-block mr-1 shadow-[0_0_5px_green]"></span> ON`;
+                card.classList.remove('alert-state');
+            } else if (isFresh) {
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700";
+                badge.innerHTML = `<span class="h-2 w-2 rounded-full bg-amber-500 inline-block mr-1"></span> STANDBY`;
+                card.classList.remove('alert-state');
+            } else if (st.lastSeenAt || Object.keys(st.inverters).length > 0) {
+                badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700";
+                badge.innerHTML = `<span class="h-2 w-2 rounded-full bg-blue-500 inline-block mr-1"></span> LAST DATA`;
                 card.classList.remove('alert-state');
             } else {
                 badge.className = "text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 status-badge-pulse";
                 badge.innerHTML = `<span class="h-2 w-2 rounded-full bg-red-500 inline-block mr-1"></span> OFF`;
                 card.classList.add('alert-state');
             }
+            updateFleetSummary();
+        }
+
+        function updateFleetSummary() {
+            let live = 0;
+            let fleetPower = 0;
+            plants.forEach(plant => {
+                const st = plantState[plant.ws_unit_id];
+                const inverterPower = Object.values(st.inverters).reduce((sum, inv) => sum + numberValue(inv.power), 0);
+                fleetPower += st.vcbPower > 0 ? st.vcbPower : inverterPower;
+                if (st.lastSeenAt && Date.now() - st.lastSeenAt < 120000) live++;
+            });
+            document.getElementById('live-plant-count').textContent = `${live} / ${plants.length}`;
+            document.getElementById('fleet-active-power').textContent = `${fleetPower.toFixed(2)} kW`;
         }
 
         let ws;
@@ -339,6 +421,7 @@ $themeClasses = [
                 
                 plants.forEach(p => {
                     ws.send(JSON.stringify({ type: "subscribe", unit_id: p.ws_unit_id }));
+                    ws.send(JSON.stringify({ type: "get_devices", unit_id: p.ws_unit_id }));
                 });
             };
 
@@ -348,15 +431,24 @@ $themeClasses = [
                     const unit = data.unit_id;
                     if(!plantState[unit]) return;
 
+                    const plant = plants.find(p => p.ws_unit_id === unit);
+                    if (data.type === 'device_list') {
+                        if (window.LiveWsStore) window.LiveWsStore.requestTodayForDevices(ws, unit, data.devices || []);
+                        return;
+                    }
+                    if (window.LiveWsStore && plant) window.LiveWsStore.storeMessage(data, plant.id);
+
                     plantState[unit].lastUpdate = data.time || new Date().toLocaleTimeString();
+                    plantState[unit].lastSeenAt = Date.now();
 
                     if (data.values && data.values["3 Phase Active Power"] !== undefined) {
-                        plantState[unit].vcbPower = parseFloat(data.values["3 Phase Active Power"]) || 0;
+                        plantState[unit].vcbPower = powerKw(data.values["3 Phase Active Power"]);
                         plantState[unit].hasVCB = true;
                     }
 
                     if (data.virtualTags && data.virtualTags["vcb-today"] !== undefined) {
-                        plantState[unit].dailyEnergy = parseFloat(data.virtualTags["vcb-today"].value) || 0;
+                        const tag = data.virtualTags["vcb-today"];
+                        plantState[unit].dailyEnergy = numberValue(tag && typeof tag === 'object' ? tag.value : tag);
                     }
 
                     if (data.values) {
@@ -385,18 +477,19 @@ $themeClasses = [
                                         if (parseFloat(data.values[key]) > 0.5) activeStrCount++;
                                     }
                                 }
-                                const deviceName = data.device || "Unknown Inverter";
-                                let pwr = 0;
+                                const deviceName = canonicalInverterName(data.device || data.deviceName);
+                                let pwr = data.values['Total active power'] !== undefined ? powerKw(data.values['Total active power']) : 0;
                                 for (const pk in data.values) {
                                     const pkl = pk.toLowerCase();
                                     if (/active.*power|ac.*power|power.*ac|a\.c\..*power/i.test(pkl) && !/reactive|apparent|3.phase/i.test(pkl)) {
-                                        pwr = parseFloat(data.values[pk]) || 0; break;
+                                        pwr = powerKw(data.values[pk]); break;
                                     }
                                 }
                                 plantState[unit].inverters[deviceName] = {
                                     active: activeStrCount,
                                     total: totalStrCount,
-                                    power: pwr
+                                    power: pwr,
+                                    dailyGen: numberValue(data.values['Daily power yields'] ?? data.values['Today Energy'] ?? 0)
                                 };
                             }
                         }
