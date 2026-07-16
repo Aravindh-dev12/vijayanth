@@ -8,7 +8,8 @@
     <title>System Reports - Solar Plant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
     <script src="assets/live_ws_store.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -803,58 +804,87 @@
         function fmt(v) { return v !== undefined && v !== null ? Number(v).toFixed(2) : '0.00'; }
 
         function exportToPDF() {
-            if (typeof html2pdf !== 'function') {
-                document.getElementById('liveStatus').textContent = 'PDF library did not load. Refresh and try again.';
-                const button = document.getElementById('pdfExportBtn');
-                if (button) {
-                    button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
-                }
-                return;
-            }
-            const element = document.getElementById('printableReport');
-            const table = document.querySelector('.report-table');
-            const tableWidth = table.getBoundingClientRect().width || 1200;
-            const clone = element.cloneNode(true);
-            clone.classList.add('pdf-mode');
-            clone.style.position = 'fixed';
-            clone.style.left = '0';
-            clone.style.top = '0';
-            clone.style.zIndex = '99999';
-            clone.style.backgroundColor = '#ffffff';
-            clone.style.width = (tableWidth + 40) + 'px';
-            clone.style.maxWidth = 'none';
-            const cloneContainer = clone.querySelector('.table-hscroll');
-            if (cloneContainer) {
-                cloneContainer.style.overflow = 'visible';
-                cloneContainer.style.width = '100%';
-                cloneContainer.style.maxWidth = 'none';
-            }
-            document.body.appendChild(clone);
-            const opt = {
-                margin: 10,
-                filename: `solar_${plantSelect.value}_${document.getElementById('reportType').value === 'daily' ? dateInput.value : monthInput.value}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, width: tableWidth + 40, windowWidth: tableWidth + 100, scrollX: 0, scrollY: 0 },
-                jsPDF: { unit: 'mm', format: 'a3', orientation: 'landscape' }
+            const button = document.getElementById('pdfExportBtn');
+            const resetButton = () => {
+                if (!button) return;
+                button.disabled = false;
+                button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
             };
-            html2pdf().set(opt).from(clone).save().then(() => {
-                document.body.removeChild(clone);
-                const button = document.getElementById('pdfExportBtn');
-                if (button) {
-                    button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
+
+            try {
+                if (!window.jspdf?.jsPDF || !lastReportData?.data?.length) {
+                    throw new Error('PDF library or report data is unavailable');
                 }
-            }).catch((error) => {
+
+                const type = document.getElementById('reportType').value;
+                const period = type === 'daily' ? dateInput.value : monthInput.value;
+                const plant = plants.find(item => item.id === plantSelect.value);
+                const rows = lastReportData.data;
+                const toNumber = value => {
+                    const parsed = parseFloat(value);
+                    return Number.isFinite(parsed) ? parsed : 0;
+                };
+                let invNames = lastReportData.meta?.inv_names || [];
+                if (!invNames.length) {
+                    const count = Number(plantConfig?.[plantSelect.value]?.inverter_count || 0);
+                    invNames = Array.from({ length: count }, (_, index) => `INV-${index + 1}`);
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3', compress: true });
+                if (typeof doc.autoTable !== 'function') throw new Error('PDF table library did not load');
+
+                const headers = [type === 'daily' ? 'Time' : 'Date', ...invNames, 'Total Generation (kWh)'];
+                const body = rows.map(row => {
+                    let calculatedTotal = 0;
+                    const inverterValues = invNames.map((_, index) => {
+                        const value = toNumber(row[`inv${index + 1}_kwh`]);
+                        calculatedTotal += value;
+                        return value.toFixed(2);
+                    });
+                    const total = toNumber(row.inv_total_kwh) > 0 ? toNumber(row.inv_total_kwh) : calculatedTotal;
+                    return [row.time_label || '-', ...inverterValues, total.toFixed(2)];
+                });
+
+                doc.setTextColor(15, 23, 42);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(18);
+                doc.text((plant?.name || 'Solar Plant').toUpperCase(), 12, 15);
+                doc.setTextColor(21, 128, 61);
+                doc.setFontSize(12);
+                doc.text('Inverter Generation Report', 12, 22);
+                doc.setTextColor(71, 85, 105);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(`Period: ${period}   Capacity: ${plant?.capacity || '-'} MW   Location: ${plant?.location || '-'}`, 12, 28);
+
+                doc.autoTable({
+                    head: [headers],
+                    body,
+                    startY: 33,
+                    margin: { top: 12, right: 10, bottom: 14, left: 10 },
+                    theme: 'grid',
+                    styles: { font: 'helvetica', fontSize: invNames.length > 12 ? 6.5 : 7.5, cellPadding: 2, halign: 'center', valign: 'middle', overflow: 'linebreak' },
+                    headStyles: { fillColor: [22, 163, 74], textColor: 255, fontStyle: 'bold', lineColor: [21, 128, 61] },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: { 0: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+                    didDrawPage: data => {
+                        const pageCount = doc.internal.getNumberOfPages();
+                        doc.setFontSize(8);
+                        doc.setTextColor(100);
+                        doc.text(`Generated ${new Date().toLocaleString('en-IN')}`, 10, doc.internal.pageSize.height - 6);
+                        doc.text(`Page ${pageCount}`, doc.internal.pageSize.width - 24, doc.internal.pageSize.height - 6);
+                    }
+                });
+
+                doc.save(`solar_${plantSelect.value}_${period}.pdf`);
+                document.getElementById('liveStatus').textContent = 'PDF generated successfully';
+                resetButton();
+            } catch (error) {
                 console.error('[Reports] PDF export failed:', error);
-                document.getElementById('liveStatus').textContent = 'PDF export failed. Please try again.';
-                document.body.removeChild(clone);
-                const button = document.getElementById('pdfExportBtn');
-                if (button) {
-                    button.disabled = false;
-                    button.innerHTML = '<i class="fa-solid fa-file-pdf"></i><span class="hidden sm:inline">Export PDF</span>';
-                }
-            });
+                document.getElementById('liveStatus').textContent = `PDF export failed: ${error.message}`;
+                resetButton();
+            }
         }
 
         function downloadExcel() {
