@@ -478,11 +478,16 @@ $themeClasses = [
                                     }
                                 }
                                 const deviceName = canonicalInverterName(data.device || data.deviceName);
-                                let pwr = data.values['Total active power'] !== undefined ? powerKw(data.values['Total active power']) : 0;
-                                for (const pk in data.values) {
-                                    const pkl = pk.toLowerCase();
-                                    if (/active.*power|ac.*power|power.*ac|a\.c\..*power/i.test(pkl) && !/reactive|apparent|3.phase/i.test(pkl)) {
-                                        pwr = powerKw(data.values[pk]); break;
+                                const hasExactLivePower = data.values['Total active power'] !== undefined;
+                                let pwr = hasExactLivePower ? powerKw(data.values['Total active power']) : 0;
+                                if (!hasExactLivePower) {
+                                    for (const pk in data.values) {
+                                        const pkl = pk.toLowerCase();
+                                        const isRatedValue = /nominal|rated|capacity|maximum|max\.?\s*power/.test(pkl);
+                                        if (/active.*power|ac.*power|power.*ac|a\.c\..*power/i.test(pkl) && !/reactive|apparent|3.phase/i.test(pkl) && !isRatedValue) {
+                                            pwr = powerKw(data.values[pk]);
+                                            break;
+                                        }
                                     }
                                 }
                                 plantState[unit].inverters[deviceName] = {
