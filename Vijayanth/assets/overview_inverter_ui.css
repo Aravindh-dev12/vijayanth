@@ -1,11 +1,42 @@
-/* Overview inverter card refresh — applies only to the overview inverter grid. */
+/* Overview inverter cards and plant information alignment. */
+.overview-inverter-info-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 280px !important;
+    align-items: start !important;
+    gap: 16px !important;
+}
+
+.overview-inverter-panel,
+.overview-plant-info-card {
+    grid-column: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+}
+
+.overview-plant-info-card {
+    max-width: 280px !important;
+    justify-self: end !important;
+    align-self: start !important;
+}
+
+.overview-plant-info-card .flex.justify-between {
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.overview-plant-info-card .flex.justify-between > :last-child {
+    max-width: 160px;
+    text-align: right;
+    overflow-wrap: anywhere;
+}
+
 #inverterGrid {
-    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)) !important;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
     gap: 12px !important;
 }
 
 #inverterGrid > div:not(.col-span-full) {
-    min-height: 138px !important;
+    min-height: 132px !important;
     border-radius: 14px !important;
     padding: 14px !important;
     overflow: hidden;
@@ -53,16 +84,33 @@
 }
 
 #inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) {
-    margin-top: 18px !important;
+    margin-top: 16px !important;
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 5px !important;
+    min-width: 0;
+    white-space: nowrap !important;
     text-align: left !important;
-    font-size: 26px !important;
     line-height: 1 !important;
-    letter-spacing: -.025em;
 }
 
-#inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) span {
-    font-size: 11px !important;
-    opacity: .82;
+#inverterGrid .overview-power-value {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: clamp(20px, 1.65vw, 25px) !important;
+    font-weight: 900;
+    letter-spacing: -.035em;
+    font-variant-numeric: tabular-nums;
+}
+
+#inverterGrid .overview-power-unit {
+    flex: 0 0 auto;
+    font-size: 10px !important;
+    font-weight: 800;
+    opacity: .84;
+    line-height: 1;
 }
 
 #inverterGrid > div:not(.col-span-full) > div:last-child {
@@ -90,6 +138,18 @@
 #inverterGrid > div:not(.col-span-full) > div:last-child p {
     font-size: 12px !important;
     line-height: 1.2 !important;
+    white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+    .overview-inverter-info-row {
+        grid-template-columns: 1fr !important;
+    }
+
+    .overview-plant-info-card {
+        max-width: none !important;
+        justify-self: stretch !important;
+    }
 }
 
 @media (max-width: 640px) {
@@ -99,13 +159,13 @@
     }
 
     #inverterGrid > div:not(.col-span-full) {
-        min-height: 128px !important;
+        min-height: 124px !important;
         padding: 12px !important;
         border-radius: 12px !important;
     }
 
-    #inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) {
-        font-size: 22px !important;
+    #inverterGrid .overview-power-value {
+        font-size: 20px !important;
     }
 
     #inverterGrid > div:not(.col-span-full) > div:last-child {
