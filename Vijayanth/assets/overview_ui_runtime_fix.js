@@ -52,7 +52,7 @@
         if (!plantCard) return;
 
         plantCard.classList.add('overview-plant-info-card');
-        if (plantCard.dataset.positioned === 'top') return;
+        if (plantCard.dataset.positioned === 'overview-after-table') return;
 
         const originalRow = plantCard.parentElement;
         const inverterPanel = originalRow ? Array.from(originalRow.children).find(el => el !== plantCard) : null;
@@ -62,9 +62,19 @@
         inverterPanel.classList.add('overview-inverter-panel');
         originalRow.classList.add('overview-inverter-row');
 
-        // Traditional dashboard placement: plant identity first, then plant KPI table and equipment.
-        content.insertBefore(plantCard, content.firstElementChild);
-        plantCard.dataset.positioned = 'top';
+        const overviewTable = Array.from(content.children).find(el => {
+            const title = el.querySelector('div.bg-emerald-700, .plant-table-heading');
+            return !!title && /plant overview/i.test(title.textContent || '');
+        });
+
+        if (overviewTable && overviewTable.nextSibling) {
+            content.insertBefore(plantCard, overviewTable.nextSibling);
+        } else if (overviewTable) {
+            content.appendChild(plantCard);
+        } else {
+            content.insertBefore(plantCard, content.firstElementChild || null);
+        }
+        plantCard.dataset.positioned = 'overview-after-table';
     }
 
     function apply() {
