@@ -1,0 +1,116 @@
+/* Overview inverter card refresh — applies only to the overview inverter grid. */
+#inverterGrid {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)) !important;
+    gap: 12px !important;
+}
+
+#inverterGrid > div:not(.col-span-full) {
+    min-height: 138px !important;
+    border-radius: 14px !important;
+    padding: 14px !important;
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.10) !important;
+    border: 1px solid rgba(255, 255, 255, 0.30);
+    transform: translateZ(0);
+}
+
+#inverterGrid > div:not(.col-span-full)::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(145deg, rgba(255,255,255,.16), transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+#inverterGrid > div:not(.col-span-full):hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16) !important;
+}
+
+#inverterGrid > div:not(.col-span-full) > button {
+    top: 12px !important;
+    right: 12px !important;
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 999px;
+    background: rgba(255,255,255,.16);
+    backdrop-filter: blur(4px);
+}
+
+#inverterGrid > div:not(.col-span-full) > button:hover {
+    background: rgba(255,255,255,.26);
+}
+
+#inverterGrid > div:not(.col-span-full) > p:first-of-type {
+    text-align: left !important;
+    padding: 0 38px 0 0 !important;
+    font-size: 11px !important;
+    line-height: 1.25rem !important;
+    letter-spacing: .08em !important;
+    opacity: .92;
+}
+
+#inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) {
+    margin-top: 18px !important;
+    text-align: left !important;
+    font-size: 26px !important;
+    line-height: 1 !important;
+    letter-spacing: -.025em;
+}
+
+#inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) span {
+    font-size: 11px !important;
+    opacity: .82;
+}
+
+#inverterGrid > div:not(.col-span-full) > div:last-child {
+    position: absolute !important;
+    left: 14px !important;
+    right: 14px !important;
+    bottom: 12px !important;
+    padding-top: 9px !important;
+    border-top-color: rgba(255,255,255,.25) !important;
+    text-align: left !important;
+}
+
+#inverterGrid > div:not(.col-span-full) > div:last-child::before {
+    content: "Today generation";
+    display: block;
+    margin-bottom: 2px;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    opacity: .68;
+}
+
+#inverterGrid > div:not(.col-span-full) > div:last-child p {
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+}
+
+@media (max-width: 640px) {
+    #inverterGrid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 9px !important;
+    }
+
+    #inverterGrid > div:not(.col-span-full) {
+        min-height: 128px !important;
+        padding: 12px !important;
+        border-radius: 12px !important;
+    }
+
+    #inverterGrid > div:not(.col-span-full) > p:nth-of-type(2) {
+        font-size: 22px !important;
+    }
+
+    #inverterGrid > div:not(.col-span-full) > div:last-child {
+        left: 12px !important;
+        right: 12px !important;
+        bottom: 10px !important;
+    }
+}
