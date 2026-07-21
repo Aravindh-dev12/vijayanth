@@ -10,10 +10,10 @@
         state[plant.ws_unit_id] = {
             plantId,
             devices: new Set(),
-            hoursByDevice: {},
+            samplesByDevice: {},
             liveByDevice: {},
-            lastPeakKw: 0,
-            lastPeakHour: null
+            peakKw: 0,
+            peakTime: ''
         };
     });
 
@@ -29,33 +29,17 @@
         return Math.abs(n) > 10000 ? n / 1000 : n;
     }
 
-    function inverterNumber(name) {
-        const text = String(name || '');
-        const match = text.match(/(?:inverter|inv|solar)\s*[-_#:]?\s*0*(\d+)\b/i);
-        return match ? parseInt(match[1], 10) : null;
-    }
-
     function canonicalDevice(name) {
-        const n = inverterNumber(name);
-        return n ? `INVERTER${n}` : '';
+        const match = String(name || '').match(/(?:inverter|inv|solar)\s*[-_#:]?\s*0*(\d+)\b/i);
+        return match ? `INVERTER${parseInt(match[1], 10)}` : '';
     }
 
     function extractPower(values) {
         if (!values || typeof values !== 'object') return null;
-        const preferred = [
-            /^total active power(?:\s*\([^)]*\))?$/i,
-            /^active power(?:\s*\([^)]*\))?$/i,
-            /^ac active power/i,
-            /^ac power/i,
-            /^output power/i,
-            /^power output/i,
-            /^pac$/i,
-            /^p ac$/i
-        ];
+        const preferred = [/^total active power/i, /^active power/i, /^ac active power/i, /^ac power/i, /^output power/i, /^power output/i, /^pac$/i, /^p ac$/i];
         const rejected = /reactive|apparent|nominal|rated|capacity|maximum|max power|dc power|string|mppt|yield|energy|factor|3[ ._-]*phase/i;
         for (const [key, raw] of Object.entries(values)) {
-            if (rejected.test(key)) continue;
-            if (!preferred.some(rx => rx.test(key.trim()))) continue;
+            if (rejected.test(key) || !preferred.some(rx => rx.test(key.trim()))) continue;
             const value = powerKw(raw);
             if (value !== null) return value;
         }
@@ -67,12 +51,13 @@
         return null;
     }
 
-    function hourFromTimestamp(value) {
-        const text = String(value || '');
-        const direct = text.match(/(?:T|\s|^)(\d{1,2}):\d{2}/);
-        if (direct) return Math.max(0, Math.min(23, parseInt(direct[1], 10)));
+    function minuteKey(value) {
+        const text = String(value || '').trim();
+        const direct = text.match(/(?:T|\s|^)(\d{1,2}):(\d{2})/);
+        if (direct) return `${String(parseInt(direct[1], 10)).padStart(2, '0')}:${direct[2]}`;
         const date = new Date(text);
-        return Number.isNaN(date.getTime()) ? null : date.getHours();
+        if (Number.isNaN(date.getTime())) return '';
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
     }
 
     function ensurePeakUi(plantId) {
@@ -91,10 +76,10 @@
         box.className = 'bg-slate-50 rounded-lg p-3 border border-slate-100 flex flex-col justify-center min-w-0';
         box.innerHTML = `
             <div class="text-slate-400 text-[10px] font-bold uppercase mb-1 tracking-wider whitespace-nowrap">
-                <i class="fa-solid fa-chart-column text-blue-500 mr-1"></i>Peak Hour
+                <i class="fa-solid fa-arrow-trend-up text-blue-500 mr-1"></i>Today Peak Power
             </div>
             <div class="text-sm font-black text-slate-800 truncate" data-peak-value>-- kW</div>
-            <div class="text-[9px] font-semibold text-slate-400 mt-0.5" data-peak-time>Waiting for history</div>`;
+            <div class="text-[9px] font-semibold text-slate-400 mt-0.5" data-peak-time>Waiting for today data</div>`;
         metricsGrid.appendChild(box);
         return box;
     }
@@ -102,45 +87,38 @@
     function renderPeak(unitId) {
         const st = state[unitId];
         if (!st) return;
-        const totals = new Array(24).fill(0);
-        const contributors = new Array(24).fill(0);
 
-        Object.values(st.hoursByDevice).forEach(hours => {
-            Object.entries(hours || {}).forEach(([hourText, value]) => {
-                const hour = parseInt(hourText, 10);
-                if (!Number.isInteger(hour) || hour < 0 || hour > 23) return;
-                totals[hour] += Number(value) || 0;
-                contributors[hour] += 1;
+        const totalsByMinute = {};
+        Object.values(st.samplesByDevice).forEach(samples => {
+            Object.entries(samples || {}).forEach(([minute, value]) => {
+                totalsByMinute[minute] = (totalsByMinute[minute] || 0) + (Number(value) || 0);
             });
         });
 
-        Object.entries(st.liveByDevice).forEach(([, sample]) => {
-            if (!sample || sample.hour === null || sample.power === null) return;
-            if (!st.hoursByDevice[sample.device]?.[sample.hour] && sample.power >= 0) {
-                totals[sample.hour] += sample.power;
-                contributors[sample.hour] += 1;
+        Object.entries(st.liveByDevice).forEach(([device, sample]) => {
+            if (!sample || !sample.minute || sample.power === null) return;
+            if (st.samplesByDevice[device]?.[sample.minute] === undefined) {
+                totalsByMinute[sample.minute] = (totalsByMinute[sample.minute] || 0) + sample.power;
             }
         });
 
-        let peakHour = null;
         let peakKw = 0;
-        totals.forEach((value, hour) => {
-            if (contributors[hour] > 0 && value > peakKw) {
-                peakKw = value;
-                peakHour = hour;
+        let peakTime = '';
+        Object.entries(totalsByMinute).forEach(([minute, total]) => {
+            if (total > peakKw) {
+                peakKw = total;
+                peakTime = minute;
             }
         });
 
-        st.lastPeakKw = peakKw;
-        st.lastPeakHour = peakHour;
+        st.peakKw = peakKw;
+        st.peakTime = peakTime;
         const box = ensurePeakUi(st.plantId);
         if (!box) return;
         const valueEl = box.querySelector('[data-peak-value]');
         const timeEl = box.querySelector('[data-peak-time]');
-        if (valueEl) valueEl.textContent = peakHour === null ? '-- kW' : `${peakKw.toFixed(1)} kW`;
-        if (timeEl) timeEl.textContent = peakHour === null
-            ? 'No inverter history'
-            : `${String(peakHour).padStart(2, '0')}:00–${String((peakHour + 1) % 24).padStart(2, '0')}:00 · all inverters`;
+        if (valueEl) valueEl.textContent = peakTime ? `${peakKw.toFixed(1)} kW` : '-- kW';
+        if (timeEl) timeEl.textContent = peakTime ? `Highest combined reading at ${peakTime}` : 'No inverter history today';
     }
 
     function processDailyResult(message) {
@@ -150,22 +128,18 @@
         const device = canonicalDevice(rawName);
         if (!device) return;
 
-        const rows = Array.isArray(message.data)
-            ? message.data
-            : Array.isArray(message.result) ? message.result
-            : Array.isArray(message.results) ? message.results : [];
+        const rows = Array.isArray(message.data) ? message.data : Array.isArray(message.result) ? message.result : Array.isArray(message.results) ? message.results : [];
         if (!rows.length) return;
 
-        const hourly = {};
+        const samples = {};
         rows.forEach(row => {
             const values = row?.values || row?.data || {};
             const power = extractPower(values);
-            const hour = hourFromTimestamp(row?.time || row?.timestamp || row?.dateTime || row?.datetime || row?.bucket);
-            if (power === null || hour === null || power < 0) return;
-            // Use the highest observed sample in each hour for this inverter.
-            hourly[hour] = Math.max(hourly[hour] || 0, power);
+            const minute = minuteKey(row?.time || row?.timestamp || row?.dateTime || row?.datetime || row?.bucket);
+            if (power === null || !minute || power < 0) return;
+            samples[minute] = Math.max(samples[minute] || 0, power);
         });
-        st.hoursByDevice[device] = hourly;
+        st.samplesByDevice[device] = samples;
         renderPeak(message.unit_id);
     }
 
@@ -176,7 +150,9 @@
         if (!device) return;
         const power = extractPower(message.values);
         if (power === null || power < 0) return;
-        st.liveByDevice[device] = { device, hour: new Date().getHours(), power };
+        const now = new Date();
+        const minute = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        st.liveByDevice[device] = { minute, power };
         renderPeak(message.unit_id);
     }
 
@@ -192,9 +168,7 @@
     }
 
     function refreshHistory() {
-        Object.entries(state).forEach(([unitId, st]) => {
-            st.devices.forEach(deviceName => requestToday(unitId, deviceName));
-        });
+        Object.entries(state).forEach(([unitId, st]) => st.devices.forEach(deviceName => requestToday(unitId, deviceName)));
     }
 
     function connect() {
@@ -225,7 +199,7 @@
                 if (message.type === 'daily_data_result') processDailyResult(message);
                 else processLive(message);
             } catch (error) {
-                console.warn('[AdminPeakHour] Unable to parse telemetry', error);
+                console.warn('[AdminTodayPeak] Unable to parse telemetry', error);
             }
         });
         socket.addEventListener('close', () => {
