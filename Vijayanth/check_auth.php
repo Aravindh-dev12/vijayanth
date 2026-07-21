@@ -24,7 +24,6 @@ if ($role !== 'admin') {
     $assignedPlant = $emailPlantMap[$email] ?? strtolower(trim((string)($user['plant_id'] ?? '')));
 
     if (!isset($PLANTS[$assignedPlant])) {
-        // Never silently expose the default/first plant to an invalid plant user.
         session_unset();
         session_destroy();
         header('Location: index.php?expired=1');
@@ -32,8 +31,6 @@ if ($role !== 'admin') {
     }
 
     $currentPlant = $assignedPlant;
-
-    // Repair stale session data immediately so every page and API call agrees.
     $_SESSION['user']['plant_id'] = $currentPlant;
     $_SESSION['plant_id'] = $currentPlant;
     $user = $_SESSION['user'];
@@ -51,4 +48,20 @@ if (basename($_SERVER['SCRIPT_NAME']) === 'admin.php' && $role !== 'admin') {
     header('Location: overview.php?plant=' . urlencode($currentPlant));
     exit;
 }
+
+// Inject the authoritative signed-in plant context into every protected HTML
+// page. This avoids relying on sidebar script execution or stale browser data.
+$signedPlantIdJson = json_encode($currentPlant, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+$signedRoleJson = json_encode($role, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+$signedConfigJson = getPlantPublicConfigJson();
+
+ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfigJson) {
+    if (stripos($html, '</body>') === false) return $html;
+
+    $injection = "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>"
+        . "\n<script src=\"assets/inverter3_fix.js?v=20260721-3\"></script>"
+        . "\n<script src=\"assets/signed_plant_context.js?v=20260721-1\"></script>\n";
+
+    return preg_replace('/<\/body>/i', $injection . '</body>', $html, 1);
+});
 ?>
