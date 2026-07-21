@@ -44,6 +44,13 @@
         if (count && count.textContent !== String(validCount)) count.textContent = String(validCount);
     }
 
+    function findOverviewTable(content) {
+        return Array.from(content.children).find(el => {
+            const title = el.querySelector('div.bg-emerald-700, .plant-table-heading');
+            return !!title && /plant overview/i.test(title.textContent || '');
+        });
+    }
+
     function positionPlantInformation() {
         const heading = Array.from(document.querySelectorAll('h3')).find(el =>
             (el.textContent || '').trim().toLowerCase() === 'plant information'
@@ -52,7 +59,7 @@
         if (!plantCard) return;
 
         plantCard.classList.add('overview-plant-info-card');
-        if (plantCard.dataset.positioned === 'overview-after-table') return;
+        if (plantCard.dataset.positioned === 'overview-side-card') return;
 
         const originalRow = plantCard.parentElement;
         const inverterPanel = originalRow ? Array.from(originalRow.children).find(el => el !== plantCard) : null;
@@ -62,19 +69,23 @@
         inverterPanel.classList.add('overview-inverter-panel');
         originalRow.classList.add('overview-inverter-row');
 
-        const overviewTable = Array.from(content.children).find(el => {
-            const title = el.querySelector('div.bg-emerald-700, .plant-table-heading');
-            return !!title && /plant overview/i.test(title.textContent || '');
-        });
-
-        if (overviewTable && overviewTable.nextSibling) {
-            content.insertBefore(plantCard, overviewTable.nextSibling);
-        } else if (overviewTable) {
-            content.appendChild(plantCard);
-        } else {
+        const overviewTable = findOverviewTable(content);
+        if (!overviewTable) {
             content.insertBefore(plantCard, content.firstElementChild || null);
+            plantCard.dataset.positioned = 'overview-side-card';
+            return;
         }
-        plantCard.dataset.positioned = 'overview-after-table';
+
+        let sideRow = document.querySelector('.overview-table-info-row');
+        if (!sideRow) {
+            sideRow = document.createElement('div');
+            sideRow.className = 'overview-table-info-row';
+            content.insertBefore(sideRow, overviewTable);
+        }
+
+        sideRow.appendChild(overviewTable);
+        sideRow.appendChild(plantCard);
+        plantCard.dataset.positioned = 'overview-side-card';
     }
 
     function apply() {
