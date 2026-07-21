@@ -55,11 +55,11 @@
                 box-shadow: none !important;
                 border: 1px solid #e2e8f0;
             }
-            #sidebar #sidebarPlantName { color: var(--plant-dark) !important; }
+            #sidebar #sidebarPlantName { color: #111827 !important; }
             #sidebar #sidebarNav .nav-item {
                 position: relative;
                 background: transparent !important;
-                color: #64748b !important;
+                color: #111827 !important;
                 border-left-color: transparent !important;
             }
             #sidebar #sidebarNav .nav-item > i {
@@ -74,11 +74,11 @@
             }
             #sidebar #sidebarNav .nav-item:hover {
                 background: #f8fafc !important;
-                color: var(--plant-dark) !important;
+                color: #111827 !important;
             }
             #sidebar #sidebarNav .plant-active-nav {
                 background: #f1f5f9 !important;
-                color: var(--plant-dark) !important;
+                color: #111827 !important;
                 border-left: 4px solid var(--plant-main) !important;
                 font-weight: 700 !important;
             }
@@ -89,7 +89,7 @@
             }
             #sidebar #adminBackDashboard {
                 background: transparent !important;
-                color: var(--plant-dark) !important;
+                color: #111827 !important;
             }
             #sidebar #adminBackDashboard:hover { background: #f1f5f9 !important; }
             #sidebar #collapseSidebarBtn {
@@ -100,7 +100,7 @@
             body[data-plant-theme] main header h1,
             body[data-plant-theme] main header h2,
             body[data-plant-theme] .plant-themed-text {
-                color: var(--plant-dark) !important;
+                color: #111827 !important;
             }
             body[data-plant-theme] table thead,
             body[data-plant-theme] .plant-table-heading {
@@ -126,7 +126,7 @@
         const footerBrand = document.querySelector('#sidebar .text-emerald-700');
         if (footerBrand) {
             footerBrand.classList.remove('text-emerald-700');
-            footerBrand.style.color = theme.dark;
+            footerBrand.style.color = '#111827';
         }
 
         const currentPage = (window.location.pathname.split('/').pop() || 'overview.php').toLowerCase();
