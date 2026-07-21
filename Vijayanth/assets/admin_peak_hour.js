@@ -68,18 +68,18 @@
 
         const metricsGrid = card.querySelector('.p-4.grid.grid-cols-2');
         if (!metricsGrid) return null;
-        metricsGrid.classList.remove('grid-cols-2');
-        metricsGrid.classList.add('grid-cols-3');
 
         box = document.createElement('div');
         box.id = `peak-${plantId}`;
-        box.className = 'bg-slate-50 rounded-lg p-3 border border-slate-100 flex flex-col justify-center min-w-0';
+        box.className = 'col-span-2 bg-slate-50 rounded-lg px-3 py-2.5 border border-slate-100 flex items-center justify-between gap-3 min-w-0 overflow-hidden';
         box.innerHTML = `
-            <div class="text-slate-400 text-[10px] font-bold uppercase mb-1 tracking-wider whitespace-nowrap">
-                <i class="fa-solid fa-arrow-trend-up text-blue-500 mr-1"></i>Today Peak Power
+            <div class="min-w-0">
+                <div class="text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wide leading-tight">
+                    <i class="fa-solid fa-arrow-trend-up text-blue-500 mr-1"></i>Today Peak Power
+                </div>
+                <div class="text-[9px] font-semibold text-slate-400 mt-1 truncate" data-peak-time>Waiting for today data</div>
             </div>
-            <div class="text-sm font-black text-slate-800 truncate" data-peak-value>-- kW</div>
-            <div class="text-[9px] font-semibold text-slate-400 mt-0.5" data-peak-time>Waiting for today data</div>`;
+            <div class="text-sm sm:text-base font-black text-slate-800 whitespace-nowrap shrink-0" data-peak-value>-- kW</div>`;
         metricsGrid.appendChild(box);
         return box;
     }
