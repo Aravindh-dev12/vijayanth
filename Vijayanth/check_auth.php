@@ -58,7 +58,8 @@ $signedConfigJson = getPlantPublicConfigJson();
 ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfigJson) {
     if (stripos($html, '</body>') === false) return $html;
 
-    $injection = "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>"
+    $injection = "\n<link rel=\"stylesheet\" href=\"assets/overview_inverter_ui.css?v=20260721-1\">"
+        . "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>"
         . "\n<script src=\"assets/inverter3_fix.js?v=20260721-3\"></script>"
         . "\n<script src=\"assets/signed_plant_context.js?v=20260721-1\"></script>\n";
 
