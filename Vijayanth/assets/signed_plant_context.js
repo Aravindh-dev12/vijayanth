@@ -11,10 +11,10 @@
     const unitId = plant.ws_unit_id || '';
 
     const themeMap = {
-        vijayanth: { key: 'violet', main: '#8b5cf6', iconBg: '#f5f3ff', headerBg: '#ede9fe', border: '#ddd6fe' },
-        bojaraj: { key: 'violet', main: '#8b5cf6', iconBg: '#f5f3ff', headerBg: '#ede9fe', border: '#ddd6fe' },
-        krishna: { key: 'emerald', main: '#10b981', iconBg: '#ecfdf5', headerBg: '#d1fae5', border: '#a7f3d0' },
-        vijayanth_cosmic: { key: 'blue', main: '#3b82f6', iconBg: '#eff6ff', headerBg: '#dbeafe', border: '#bfdbfe' }
+        vijayanth: { key: 'violet', main: '#8b5cf6', headerBg: '#ede9fe', border: '#ddd6fe' },
+        bojaraj: { key: 'violet', main: '#8b5cf6', headerBg: '#ede9fe', border: '#ddd6fe' },
+        krishna: { key: 'emerald', main: '#10b981', headerBg: '#d1fae5', border: '#a7f3d0' },
+        vijayanth_cosmic: { key: 'blue', main: '#3b82f6', headerBg: '#dbeafe', border: '#bfdbfe' }
     };
     const theme = themeMap[plantId] || themeMap.vijayanth_cosmic;
 
@@ -36,48 +36,41 @@
         style.textContent = `
             :root {
                 --plant-main: ${theme.main};
-                --plant-icon-bg: ${theme.iconBg};
                 --plant-header-bg: ${theme.headerBg};
                 --plant-border: ${theme.border};
             }
-            #sidebar {
-                background: #fff !important;
-                border-right-color: #e2e8f0 !important;
-            }
+            #sidebar { background: #fff !important; border-right-color: #e2e8f0 !important; }
             #sidebar #sidebarHeader,
             #sidebar #sidebarNav,
-            #sidebar > div:last-child {
-                background: transparent !important;
-            }
+            #sidebar > div:last-child { background: transparent !important; }
             #sidebar #logoWrapper {
-                background: var(--plant-icon-bg) !important;
+                background: #f1f5f9 !important;
                 color: var(--plant-main) !important;
                 box-shadow: none !important;
-                border: 1px solid var(--plant-border) !important;
+                border: 1px solid #e2e8f0 !important;
             }
             #sidebar #sidebarPlantName,
             #sidebar #sidebarNav .nav-item,
             #sidebar #adminBackDashboard,
             body[data-plant-theme] main header h1,
             body[data-plant-theme] main header h2,
-            body[data-plant-theme] .plant-themed-text {
-                color: #111827 !important;
-            }
+            body[data-plant-theme] .plant-themed-text { color: #111827 !important; }
             #sidebar #sidebarNav .nav-item {
                 position: relative;
                 background: transparent !important;
                 border-left-color: transparent !important;
             }
             #sidebar #sidebarNav .nav-item > i {
-                width: 28px !important;
-                height: 28px !important;
+                width: 20px !important;
+                height: 20px !important;
                 display: inline-flex;
                 align-items: center;
                 justify-content: center;
                 color: var(--plant-main) !important;
-                background: var(--plant-icon-bg) !important;
-                border: 1px solid var(--plant-border) !important;
-                border-radius: 8px;
+                background: transparent !important;
+                border: 0 !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
             }
             #sidebar #sidebarNav .nav-item:hover,
             #sidebar #sidebarNav .plant-active-nav,
@@ -91,14 +84,15 @@
             }
             #sidebar #sidebarNav .plant-active-nav > i {
                 color: var(--plant-main) !important;
-                background: var(--plant-icon-bg) !important;
+                background: transparent !important;
+                border: 0 !important;
                 box-shadow: none !important;
             }
             #sidebar #adminBackDashboard { background: transparent !important; }
             #sidebar #collapseSidebarBtn {
                 color: var(--plant-main) !important;
                 border-color: var(--plant-border) !important;
-                background: var(--plant-icon-bg) !important;
+                background: #fff !important;
             }
             body[data-plant-theme] table thead,
             body[data-plant-theme] .plant-table-heading,
@@ -108,9 +102,7 @@
                 border-color: var(--plant-border) !important;
             }
             body[data-plant-theme] table thead th,
-            body[data-plant-theme] .plant-table-heading * {
-                color: #111827 !important;
-            }
+            body[data-plant-theme] .plant-table-heading * { color: #111827 !important; }
         `;
         document.head.appendChild(style);
     }
@@ -119,7 +111,6 @@
         installThemeStyles();
         document.body?.setAttribute('data-plant-theme', theme.key);
         document.documentElement.style.setProperty('--plant-main', theme.main);
-        document.documentElement.style.setProperty('--plant-icon-bg', theme.iconBg);
         document.documentElement.style.setProperty('--plant-header-bg', theme.headerBg);
         document.documentElement.style.setProperty('--plant-border', theme.border);
 
