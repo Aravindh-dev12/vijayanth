@@ -61,6 +61,11 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
         $injection .= "\n<link rel=\"stylesheet\" href=\"assets/overview_inverter_ui.css?v=20260721-5\">";
         $injection .= "\n<script src=\"assets/inverter3_fix.js?v=20260721-4\"></script>";
         $injection .= "\n<script src=\"assets/overview_ui_runtime_fix.js?v=20260721-5\"></script>";
+        $injection .= "\n<script src=\"assets/overview_week_generation.js?v=20260721-1\"></script>";
+    }
+
+    if ($currentPage === 'sld.php') {
+        $injection .= "\n<script src=\"assets/sld_live_dynamic.js?v=20260721-1\"></script>";
     }
 
     if ($currentPage === 'admin.php') {
@@ -71,7 +76,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
         $injection .= "\n<script src=\"assets/availability_cleanup.js?v=20260721-2\"></script>";
     }
 
-    $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-7\"></script>\n";
+    $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-8\"></script>\n";
 
     return preg_replace('/<\/body>/i', $injection . '</body>', $html, 1);
 });
