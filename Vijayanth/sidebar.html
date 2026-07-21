@@ -101,7 +101,8 @@
         const plantNames = {
             'vijayanth': 'Bojaraj Textiles Pvt Ltd',
             'bojaraj': 'Bojaraj Textiles Pvt Ltd',
-            'krishna': 'Krishna poultry farm'
+            'krishna': 'Krishna poultry farm',
+            'vijayanth_cosmic': 'Vijayanth Cosmic Powers Pvt Ltd'
         };
 
         const plantName = plantNames[plant] || plant.replace(/[-_]/g, ' ');
@@ -121,7 +122,7 @@
 
         navLinks.forEach(link => {
             const href = link.getAttribute('href');
-            if (href === 'logout.php') return; 
+            if (href === 'logout.php') return;
             if (!href.includes('?plant=')) {
                 link.setAttribute('href', `${href}?plant=${encodeURIComponent(plant)}`);
             }
@@ -148,7 +149,7 @@
                 sidebar.classList.remove('w-64');
                 sidebar.classList.add('w-16');
                 if (logoWrapper) logoWrapper.classList.add('hidden');
-                
+
                 if (collapseBtn) {
                     collapseBtn.innerHTML = '<i class="fa-solid fa-chevron-right text-[10px]"></i>';
                     collapseBtn.className = "flex items-center justify-center w-10 h-10 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 shadow-md hover:bg-emerald-100 transition-all mx-auto mt-2";
@@ -156,7 +157,7 @@
 
                 document.querySelectorAll('.sidebar-text').forEach(el => el.classList.add('hidden'));
                 document.querySelectorAll('.sidebar-content').forEach(el => el.classList.add('justify-center'));
-                
+
                 if (sidebarNav) {
                     sidebarNav.classList.remove('p-4');
                     sidebarNav.classList.add('px-2', 'py-4');
@@ -175,7 +176,7 @@
                 sidebar.classList.remove('w-16');
                 sidebar.classList.add('w-64');
                 if (logoWrapper) logoWrapper.classList.remove('hidden');
-                
+
                 if (collapseBtn) {
                     collapseBtn.innerHTML = '<i class="fa-solid fa-chevron-left text-[10px]"></i>';
                     collapseBtn.className = "hidden md:flex absolute -right-3 top-6 items-center justify-center w-6 h-6 rounded-full bg-white border border-gray-200 text-gray-400 hover:text-emerald-600 hover:border-emerald-300 shadow-sm transition-all z-50";
@@ -183,7 +184,7 @@
 
                 document.querySelectorAll('.sidebar-text').forEach(el => el.classList.remove('hidden'));
                 document.querySelectorAll('.sidebar-content').forEach(el => el.classList.remove('justify-center'));
-                
+
                 if (sidebarNav) {
                     sidebarNav.classList.remove('px-2', 'py-4');
                     sidebarNav.classList.add('p-4');
@@ -215,3 +216,4 @@
         initSidebar();
     }
 </script>
+<script src="assets/inverter3_fix.js?v=20260721-1"></script>
