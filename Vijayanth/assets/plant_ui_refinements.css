@@ -1,18 +1,18 @@
-/* Shared plant-theme refinements: slightly stronger accents, black text, neutral surfaces. */
+/* Shared plant-theme refinements: stronger soft accents, black text, neutral surfaces. */
 body[data-plant-theme="violet"] {
-    --plant-main: #7c3aed;
-    --plant-header-bg: #ddd6fe;
-    --plant-border: #c4b5fd;
+    --plant-main: #6d28d9;
+    --plant-header-bg: #d8ccfb;
+    --plant-border: #b9a5ef;
 }
 body[data-plant-theme="emerald"] {
-    --plant-main: #059669;
-    --plant-header-bg: #a7f3d0;
-    --plant-border: #6ee7b7;
+    --plant-main: #047857;
+    --plant-header-bg: #9fe3c4;
+    --plant-border: #68c99f;
 }
 body[data-plant-theme="blue"] {
-    --plant-main: #2563eb;
-    --plant-header-bg: #bfdbfe;
-    --plant-border: #93c5fd;
+    --plant-main: #1d4ed8;
+    --plant-header-bg: #b3d2fa;
+    --plant-border: #7fb1ef;
 }
 
 body[data-plant-theme] table thead,
@@ -27,55 +27,128 @@ body[data-plant-theme] .plant-table-heading * {
     color: #111827 !important;
 }
 
-/* Overview: centered, balanced plant-information strip above inverter cards. */
+/* Overview: traditional dashboard information card below KPIs and above equipment. */
 .overview-plant-info-card {
     width: 100% !important;
-    max-width: 1180px !important;
-    margin: 0 auto 18px !important;
-    border-color: #dbe3ec !important;
+    max-width: none !important;
+    margin: 0 0 18px !important;
+    border: 1px solid #dbe3ec !important;
+    border-radius: 12px !important;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, .05) !important;
+    background: #fff !important;
+    overflow: hidden !important;
 }
+
 .overview-plant-info-card > h3 {
-    padding: 12px 18px !important;
+    margin: 0 !important;
+    padding: 11px 16px !important;
     background: var(--plant-header-bg) !important;
     border-bottom: 1px solid var(--plant-border) !important;
     color: #111827 !important;
-}
-.overview-plant-info-card > div {
-    display: grid !important;
-    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
-    gap: 12px !important;
-    padding: 14px 16px 16px !important;
-}
-.overview-plant-info-card .flex.justify-between {
-    min-height: 70px !important;
-    padding: 12px 14px !important;
-    justify-content: center !important;
-    border-color: #dbe3ec !important;
-    background: #f8fafc !important;
-}
-.overview-plant-info-card .flex.justify-between:nth-child(1) { grid-column: span 4; }
-.overview-plant-info-card .flex.justify-between:nth-child(2),
-.overview-plant-info-card .flex.justify-between:nth-child(3),
-.overview-plant-info-card .flex.justify-between:nth-child(4),
-.overview-plant-info-card .flex.justify-between:nth-child(5) { grid-column: span 2; }
-.overview-plant-info-card .flex.justify-between > :first-child {
-    color: #64748b !important;
-}
-.overview-plant-info-card .flex.justify-between > :last-child {
-    color: #111827 !important;
     font-size: 12px !important;
+    font-weight: 800 !important;
+    letter-spacing: .04em !important;
+    text-transform: uppercase;
 }
 
-@media (max-width: 1050px) {
-    .overview-plant-info-card .flex.justify-between:nth-child(1) { grid-column: span 6; }
-    .overview-plant-info-card .flex.justify-between:nth-child(n+2) { grid-column: span 3; }
+.overview-plant-info-card > div {
+    display: grid !important;
+    grid-template-columns: minmax(260px, 1.8fr) repeat(4, minmax(135px, 1fr)) !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    align-items: stretch !important;
 }
-@media (max-width: 760px) {
-    .overview-plant-info-card > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-    .overview-plant-info-card .flex.justify-between:nth-child(n) { grid-column: auto; }
-    .overview-plant-info-card .flex.justify-between:first-child { grid-column: 1 / -1; }
+
+.overview-plant-info-card .flex.justify-between {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    min-height: 76px !important;
+    padding: 14px 16px !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-right: 1px solid #e5e7eb !important;
+    border-radius: 0 !important;
+    background: #fff !important;
 }
+
+.overview-plant-info-card .flex.justify-between:last-child {
+    border-right: 0 !important;
+}
+
+.overview-plant-info-card .flex.justify-between > :first-child {
+    color: #64748b !important;
+    font-size: 9px !important;
+    font-weight: 800 !important;
+    letter-spacing: .06em !important;
+    line-height: 1 !important;
+    text-transform: uppercase;
+}
+
+.overview-plant-info-card .flex.justify-between > :last-child {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    color: #111827 !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    line-height: 1.35 !important;
+    text-align: left !important;
+    overflow-wrap: anywhere;
+}
+
+.overview-plant-info-card #plantStatusBadge {
+    display: inline-flex !important;
+    align-items: center !important;
+    padding: 3px 8px !important;
+    border: 1px solid #d1d5db !important;
+    border-radius: 999px !important;
+    background: #f8fafc !important;
+}
+
+@media (max-width: 1100px) {
+    .overview-plant-info-card > div {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+    .overview-plant-info-card .flex.justify-between:first-child {
+        grid-column: span 2;
+    }
+    .overview-plant-info-card .flex.justify-between:nth-child(3n) {
+        border-right: 0 !important;
+    }
+    .overview-plant-info-card .flex.justify-between {
+        border-bottom: 1px solid #e5e7eb !important;
+    }
+}
+
+@media (max-width: 700px) {
+    .overview-plant-info-card > div {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+    .overview-plant-info-card .flex.justify-between:first-child {
+        grid-column: 1 / -1;
+    }
+    .overview-plant-info-card .flex.justify-between:nth-child(odd) {
+        border-right: 1px solid #e5e7eb !important;
+    }
+    .overview-plant-info-card .flex.justify-between:nth-child(even) {
+        border-right: 0 !important;
+    }
+}
+
 @media (max-width: 480px) {
-    .overview-plant-info-card > div { grid-template-columns: 1fr !important; }
-    .overview-plant-info-card .flex.justify-between:first-child { grid-column: auto; }
+    .overview-plant-info-card > div {
+        grid-template-columns: 1fr !important;
+    }
+    .overview-plant-info-card .flex.justify-between,
+    .overview-plant-info-card .flex.justify-between:nth-child(n) {
+        grid-column: auto;
+        border-right: 0 !important;
+        border-bottom: 1px solid #e5e7eb !important;
+        min-height: 66px !important;
+    }
+    .overview-plant-info-card .flex.justify-between:last-child {
+        border-bottom: 0 !important;
+    }
 }
