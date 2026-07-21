@@ -66,7 +66,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
         $injection .= "\n<script src=\"assets/admin_peak_hour.js?v=20260721-3\"></script>";
     }
 
-    $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-2\"></script>\n";
+    $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-3\"></script>\n";
 
     return preg_replace('/<\/body>/i', $injection . '</body>', $html, 1);
 });
