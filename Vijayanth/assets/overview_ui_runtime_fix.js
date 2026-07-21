@@ -46,9 +46,10 @@
 
     function findOverviewTable(content) {
         return Array.from(content.children).find(el => {
+            if (el.classList?.contains('overview-table-info-row')) return false;
             const title = el.querySelector('div.bg-emerald-700, .plant-table-heading');
             return !!title && /plant overview/i.test(title.textContent || '');
-        });
+        }) || Array.from(document.querySelectorAll('div.bg-emerald-700, .plant-table-heading')).map(title => title.closest('.bg-white')).find(Boolean);
     }
 
     function positionPlantInformation() {
@@ -58,20 +59,18 @@
         const plantCard = heading?.closest('.bg-white');
         if (!plantCard) return;
 
-        plantCard.classList.add('overview-plant-info-card');
-        if (plantCard.dataset.positioned === 'overview-side-card') return;
-
         const originalRow = plantCard.parentElement;
         const inverterPanel = originalRow ? Array.from(originalRow.children).find(el => el !== plantCard) : null;
-        const content = document.querySelector('main > div.p-4, main > div.sm\\:p-6') || originalRow?.parentElement;
-        if (!originalRow || !inverterPanel || !content) return;
+        const content = document.querySelector('main > div.p-4, main > div.sm\:p-6') || originalRow?.parentElement;
+        if (!content) return;
 
-        inverterPanel.classList.add('overview-inverter-panel');
-        originalRow.classList.add('overview-inverter-row');
+        plantCard.classList.add('overview-plant-info-card');
+        if (inverterPanel) inverterPanel.classList.add('overview-inverter-panel');
+        if (originalRow) originalRow.classList.add('overview-inverter-row');
 
         const overviewTable = findOverviewTable(content);
         if (!overviewTable) {
-            content.insertBefore(plantCard, content.firstElementChild || null);
+            if (!plantCard.dataset.positioned) content.insertBefore(plantCard, content.firstElementChild || null);
             plantCard.dataset.positioned = 'overview-side-card';
             return;
         }
@@ -83,8 +82,8 @@
             content.insertBefore(sideRow, overviewTable);
         }
 
-        sideRow.appendChild(overviewTable);
-        sideRow.appendChild(plantCard);
+        if (overviewTable.parentElement !== sideRow) sideRow.appendChild(overviewTable);
+        if (plantCard.parentElement !== sideRow) sideRow.appendChild(plantCard);
         plantCard.dataset.positioned = 'overview-side-card';
     }
 
@@ -104,16 +103,17 @@
     else apply();
 
     const startObserver = () => {
-        const grid = document.getElementById('inverterGrid');
-        if (!grid) {
+        const main = document.querySelector('main');
+        if (!main) {
             setTimeout(startObserver, 250);
             return;
         }
-        new MutationObserver(schedule).observe(grid, { childList: true, subtree: true, characterData: true });
+        new MutationObserver(schedule).observe(main, { childList: true, subtree: true, characterData: true });
         schedule();
     };
 
     startObserver();
     setTimeout(apply, 500);
     setTimeout(apply, 1500);
+    setTimeout(apply, 3000);
 })();
