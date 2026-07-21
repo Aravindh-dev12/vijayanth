@@ -68,7 +68,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
     }
 
     if ($currentPage === 'availability.php') {
-        $injection .= "\n<script src=\"assets/availability_cleanup.js?v=20260721-1\"></script>";
+        $injection .= "\n<script src=\"assets/availability_cleanup.js?v=20260721-2\"></script>";
     }
 
     $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-7\"></script>\n";
