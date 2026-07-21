@@ -1,0 +1,81 @@
+/* Shared plant-theme refinements: slightly stronger accents, black text, neutral surfaces. */
+body[data-plant-theme="violet"] {
+    --plant-main: #7c3aed;
+    --plant-header-bg: #ddd6fe;
+    --plant-border: #c4b5fd;
+}
+body[data-plant-theme="emerald"] {
+    --plant-main: #059669;
+    --plant-header-bg: #a7f3d0;
+    --plant-border: #6ee7b7;
+}
+body[data-plant-theme="blue"] {
+    --plant-main: #2563eb;
+    --plant-header-bg: #bfdbfe;
+    --plant-border: #93c5fd;
+}
+
+body[data-plant-theme] table thead,
+body[data-plant-theme] .plant-table-heading,
+body[data-plant-theme] .bg-emerald-700 {
+    background: var(--plant-header-bg) !important;
+    border-color: var(--plant-border) !important;
+    color: #111827 !important;
+}
+body[data-plant-theme] table thead th,
+body[data-plant-theme] .plant-table-heading * {
+    color: #111827 !important;
+}
+
+/* Overview: centered, balanced plant-information strip above inverter cards. */
+.overview-plant-info-card {
+    width: 100% !important;
+    max-width: 1180px !important;
+    margin: 0 auto 18px !important;
+    border-color: #dbe3ec !important;
+}
+.overview-plant-info-card > h3 {
+    padding: 12px 18px !important;
+    background: var(--plant-header-bg) !important;
+    border-bottom: 1px solid var(--plant-border) !important;
+    color: #111827 !important;
+}
+.overview-plant-info-card > div {
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    gap: 12px !important;
+    padding: 14px 16px 16px !important;
+}
+.overview-plant-info-card .flex.justify-between {
+    min-height: 70px !important;
+    padding: 12px 14px !important;
+    justify-content: center !important;
+    border-color: #dbe3ec !important;
+    background: #f8fafc !important;
+}
+.overview-plant-info-card .flex.justify-between:nth-child(1) { grid-column: span 4; }
+.overview-plant-info-card .flex.justify-between:nth-child(2),
+.overview-plant-info-card .flex.justify-between:nth-child(3),
+.overview-plant-info-card .flex.justify-between:nth-child(4),
+.overview-plant-info-card .flex.justify-between:nth-child(5) { grid-column: span 2; }
+.overview-plant-info-card .flex.justify-between > :first-child {
+    color: #64748b !important;
+}
+.overview-plant-info-card .flex.justify-between > :last-child {
+    color: #111827 !important;
+    font-size: 12px !important;
+}
+
+@media (max-width: 1050px) {
+    .overview-plant-info-card .flex.justify-between:nth-child(1) { grid-column: span 6; }
+    .overview-plant-info-card .flex.justify-between:nth-child(n+2) { grid-column: span 3; }
+}
+@media (max-width: 760px) {
+    .overview-plant-info-card > div { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    .overview-plant-info-card .flex.justify-between:nth-child(n) { grid-column: auto; }
+    .overview-plant-info-card .flex.justify-between:first-child { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+    .overview-plant-info-card > div { grid-template-columns: 1fr !important; }
+    .overview-plant-info-card .flex.justify-between:first-child { grid-column: auto; }
+}
