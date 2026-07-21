@@ -23,13 +23,14 @@
 
     function fixSidebarAndLinks() {
         const sidebarName = document.getElementById('sidebarPlantName');
-        if (sidebarName) sidebarName.textContent = plantName;
+        if (sidebarName && sidebarName.textContent !== plantName) sidebarName.textContent = plantName;
 
         document.querySelectorAll('#sidebarNav a').forEach(link => {
             const raw = link.getAttribute('href') || '';
             if (!raw || raw.includes('logout.php')) return;
             try {
                 const url = new URL(raw, window.location.href);
+                if (url.searchParams.get('plant') === plantId) return;
                 url.searchParams.set('plant', plantId);
                 link.setAttribute('href', url.pathname.split('/').pop() + url.search);
             } catch (e) {}
@@ -56,8 +57,8 @@
                 option.value = plantId;
                 select.appendChild(option);
             }
-            option.textContent = plantName;
-            select.value = plantId;
+            if (option.textContent !== plantName) option.textContent = plantName;
+            if (select.value !== plantId) select.value = plantId;
             if (role !== 'admin') {
                 select.style.display = 'none';
                 select.disabled = true;
@@ -67,19 +68,10 @@
         const nameEl = document.getElementById('reportPlantName');
         const locationEl = document.getElementById('reportLocation');
         const capacityEl = document.getElementById('reportCapacity');
-        if (nameEl) nameEl.textContent = plantName.toUpperCase();
-        if (locationEl) locationEl.textContent = location || '--';
-        if (capacityEl) capacityEl.textContent = `${capacity.toFixed(1)} MW`;
-
-        if (role !== 'admin') {
-            try {
-                Object.defineProperty(window, 'selectedReportPlant', {
-                    configurable: true,
-                    get: () => plantId,
-                    set: () => plantId
-                });
-            } catch (e) {}
-        }
+        if (nameEl && nameEl.textContent !== plantName.toUpperCase()) nameEl.textContent = plantName.toUpperCase();
+        if (locationEl && locationEl.textContent !== (location || '--')) locationEl.textContent = location || '--';
+        const capacityText = `${capacity.toFixed(1)} MW`;
+        if (capacityEl && capacityEl.textContent !== capacityText) capacityEl.textContent = capacityText;
     }
 
     function correctUrlForPlantUser() {
@@ -101,11 +93,14 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
     else apply();
 
-    const observer = new MutationObserver(() => {
-        fixSidebarAndLinks();
-        ensureReportsPlant();
-    });
-    observer.observe(document.documentElement, { childList: true, subtree: true });
+    const sidebarContainer = document.getElementById('sidebar-container');
+    if (sidebarContainer) {
+        const observer = new MutationObserver(() => {
+            fixSidebarAndLinks();
+            if (document.getElementById('sidebarNav')) observer.disconnect();
+        });
+        observer.observe(sidebarContainer, { childList: true, subtree: true });
+    }
 
     setTimeout(apply, 250);
     setTimeout(apply, 1000);
