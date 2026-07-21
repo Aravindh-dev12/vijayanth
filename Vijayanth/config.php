@@ -42,7 +42,7 @@ $PLANTS = [
         'theme'    => 'blue',
         'ws_url'   => 'wss://vinobasolar.scadahub.in:5001',
         'ws_unit_id' => 'via-7mw',
-        'inverter_count' => 0,
+        'inverter_count' => 3,
         'service_number' => '',
         'status'   => 'live',
     ],
