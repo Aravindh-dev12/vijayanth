@@ -44,36 +44,32 @@
         if (count && count.textContent !== String(validCount)) count.textContent = String(validCount);
     }
 
-    function findOverviewTable(content) {
-        return Array.from(content.children).find(el => {
-            if (el.classList?.contains('overview-table-info-row')) return false;
-            const title = el.querySelector('div.bg-emerald-700, .plant-table-heading');
-            return !!title && /plant overview/i.test(title.textContent || '');
-        }) || Array.from(document.querySelectorAll('div.bg-emerald-700, .plant-table-heading')).map(title => title.closest('.bg-white')).find(Boolean);
-    }
-
-    function positionPlantInformation() {
+    function findPlantInformationCard() {
         const heading = Array.from(document.querySelectorAll('h3')).find(el =>
             (el.textContent || '').trim().toLowerCase() === 'plant information'
         );
-        const plantCard = heading?.closest('.bg-white');
-        if (!plantCard) return;
+        return heading?.closest('.bg-white') || null;
+    }
 
-        const originalRow = plantCard.parentElement;
-        const inverterPanel = originalRow ? Array.from(originalRow.children).find(el => el !== plantCard) : null;
-        const content = document.querySelector('main > div.p-4, main > div.sm\:p-6') || originalRow?.parentElement;
-        if (!content) return;
+    function findPlantOverviewCard() {
+        const tableCell = document.getElementById('vcb_time') || document.getElementById('vcb_power') || document.getElementById('vcb_today');
+        const byTableCell = tableCell?.closest('.bg-white');
+        if (byTableCell) return byTableCell;
+
+        return Array.from(document.querySelectorAll('.bg-white')).find(card => {
+            const text = (card.textContent || '').replace(/\s+/g, ' ').trim();
+            return /PLANT OVERVIEW/i.test(text) && /Active Power/i.test(text) && /Life Time Energy/i.test(text);
+        }) || null;
+    }
+
+    function positionPlantInformation() {
+        const plantCard = findPlantInformationCard();
+        const overviewTable = findPlantOverviewCard();
+        const content = document.querySelector('main > div.p-4, main > div.sm\:p-6, main > div');
+        if (!plantCard || !overviewTable || !content || plantCard === overviewTable) return;
 
         plantCard.classList.add('overview-plant-info-card');
-        if (inverterPanel) inverterPanel.classList.add('overview-inverter-panel');
-        if (originalRow) originalRow.classList.add('overview-inverter-row');
-
-        const overviewTable = findOverviewTable(content);
-        if (!overviewTable) {
-            if (!plantCard.dataset.positioned) content.insertBefore(plantCard, content.firstElementChild || null);
-            plantCard.dataset.positioned = 'overview-side-card';
-            return;
-        }
+        overviewTable.classList.add('overview-main-table-card');
 
         let sideRow = document.querySelector('.overview-table-info-row');
         if (!sideRow) {
@@ -82,9 +78,15 @@
             content.insertBefore(sideRow, overviewTable);
         }
 
+        // Always rebuild this row so Plant Information never remains beside the inverter cards.
         if (overviewTable.parentElement !== sideRow) sideRow.appendChild(overviewTable);
         if (plantCard.parentElement !== sideRow) sideRow.appendChild(plantCard);
-        plantCard.dataset.positioned = 'overview-side-card';
+
+        const inverterGrid = document.getElementById('inverterGrid');
+        const inverterRow = inverterGrid?.closest('.grid.grid-cols-12');
+        const inverterPanel = inverterGrid?.closest('.bg-white');
+        if (inverterRow) inverterRow.classList.add('overview-inverter-row');
+        if (inverterPanel) inverterPanel.classList.add('overview-inverter-panel');
     }
 
     function apply() {
@@ -102,13 +104,14 @@
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply, { once: true });
     else apply();
 
+    const observer = new MutationObserver(schedule);
     const startObserver = () => {
-        const main = document.querySelector('main');
-        if (!main) {
+        const content = document.querySelector('main');
+        if (!content) {
             setTimeout(startObserver, 250);
             return;
         }
-        new MutationObserver(schedule).observe(main, { childList: true, subtree: true, characterData: true });
+        observer.observe(content, { childList: true, subtree: true, characterData: true });
         schedule();
     };
 
