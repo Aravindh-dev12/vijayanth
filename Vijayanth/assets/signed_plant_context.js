@@ -43,6 +43,16 @@
             #sidebar #sidebarHeader,
             #sidebar #sidebarNav,
             #sidebar > div:last-child { background: transparent !important; }
+            #sidebar #sidebarNav {
+                overflow-y: auto !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
+            }
+            #sidebar #sidebarNav::-webkit-scrollbar {
+                width: 0 !important;
+                height: 0 !important;
+                display: none !important;
+            }
             #sidebar #logoWrapper {
                 background: #f1f5f9 !important;
                 color: var(--plant-main) !important;
