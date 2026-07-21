@@ -55,7 +55,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
     if (stripos($html, '</body>') === false) return $html;
 
     $injection = "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>";
-    $injection .= "\n<link rel=\"stylesheet\" href=\"assets/plant_ui_refinements.css?v=20260721-3\">";
+    $injection .= "\n<link rel=\"stylesheet\" href=\"assets/plant_ui_refinements.css?v=20260721-4\">";
 
     if ($currentPage === 'overview.php') {
         $injection .= "\n<link rel=\"stylesheet\" href=\"assets/overview_inverter_ui.css?v=20260721-5\">";
@@ -65,6 +65,10 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
 
     if ($currentPage === 'admin.php') {
         $injection .= "\n<script src=\"assets/admin_peak_hour.js?v=20260721-3\"></script>";
+    }
+
+    if ($currentPage === 'availability.php') {
+        $injection .= "\n<script src=\"assets/availability_cleanup.js?v=20260721-1\"></script>";
     }
 
     $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-7\"></script>\n";
