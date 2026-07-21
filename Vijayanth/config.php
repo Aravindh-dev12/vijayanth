@@ -34,6 +34,18 @@ $PLANTS = [
         'service_number' => '069-044-6601',
         'status'   => 'live',
     ],
+    'vijayanth_cosmic' => [
+        'name'     => 'Vijayanth Cosmic Powers Pvt Ltd',
+        'db'       => 'vijayanth',
+        'capacity' => '7.0',
+        'location' => 'Tamil Nadu',
+        'theme'    => 'blue',
+        'ws_url'   => 'wss://vinobasolar.scadahub.in:5001',
+        'ws_unit_id' => 'via-7mw',
+        'inverter_count' => 0,
+        'service_number' => '',
+        'status'   => 'live',
+    ],
 ];
 
 function getDefaultPlantId() {
