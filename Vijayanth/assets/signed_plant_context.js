@@ -11,10 +11,10 @@
     const unitId = plant.ws_unit_id || '';
 
     const themeMap = {
-        vijayanth: { key: 'violet', main: '#7c3aed', dark: '#6d28d9', soft: '#ede9fe', border: '#c4b5fd' },
-        bojaraj: { key: 'violet', main: '#7c3aed', dark: '#6d28d9', soft: '#ede9fe', border: '#c4b5fd' },
-        krishna: { key: 'emerald', main: '#059669', dark: '#047857', soft: '#d1fae5', border: '#6ee7b7' },
-        vijayanth_cosmic: { key: 'blue', main: '#2563eb', dark: '#1d4ed8', soft: '#dbeafe', border: '#93c5fd' }
+        vijayanth: { key: 'violet', main: '#8b5cf6', iconBg: '#f5f3ff', headerBg: '#ede9fe', border: '#ddd6fe' },
+        bojaraj: { key: 'violet', main: '#8b5cf6', iconBg: '#f5f3ff', headerBg: '#ede9fe', border: '#ddd6fe' },
+        krishna: { key: 'emerald', main: '#10b981', iconBg: '#ecfdf5', headerBg: '#d1fae5', border: '#a7f3d0' },
+        vijayanth_cosmic: { key: 'blue', main: '#3b82f6', iconBg: '#eff6ff', headerBg: '#dbeafe', border: '#bfdbfe' }
     };
     const theme = themeMap[plantId] || themeMap.vijayanth_cosmic;
 
@@ -36,8 +36,8 @@
         style.textContent = `
             :root {
                 --plant-main: ${theme.main};
-                --plant-dark: ${theme.dark};
-                --plant-soft: ${theme.soft};
+                --plant-icon-bg: ${theme.iconBg};
+                --plant-header-bg: ${theme.headerBg};
                 --plant-border: ${theme.border};
             }
             #sidebar {
@@ -50,16 +50,22 @@
                 background: transparent !important;
             }
             #sidebar #logoWrapper {
-                background: #f1f5f9 !important;
+                background: var(--plant-icon-bg) !important;
                 color: var(--plant-main) !important;
                 box-shadow: none !important;
-                border: 1px solid #e2e8f0;
+                border: 1px solid var(--plant-border) !important;
             }
-            #sidebar #sidebarPlantName { color: #111827 !important; }
+            #sidebar #sidebarPlantName,
+            #sidebar #sidebarNav .nav-item,
+            #sidebar #adminBackDashboard,
+            body[data-plant-theme] main header h1,
+            body[data-plant-theme] main header h2,
+            body[data-plant-theme] .plant-themed-text {
+                color: #111827 !important;
+            }
             #sidebar #sidebarNav .nav-item {
                 position: relative;
                 background: transparent !important;
-                color: #111827 !important;
                 border-left-color: transparent !important;
             }
             #sidebar #sidebarNav .nav-item > i {
@@ -69,47 +75,41 @@
                 align-items: center;
                 justify-content: center;
                 color: var(--plant-main) !important;
-                background: transparent !important;
+                background: var(--plant-icon-bg) !important;
+                border: 1px solid var(--plant-border) !important;
                 border-radius: 8px;
             }
-            #sidebar #sidebarNav .nav-item:hover {
+            #sidebar #sidebarNav .nav-item:hover,
+            #sidebar #sidebarNav .plant-active-nav,
+            #sidebar #adminBackDashboard:hover {
                 background: #f8fafc !important;
                 color: #111827 !important;
             }
             #sidebar #sidebarNav .plant-active-nav {
-                background: #f1f5f9 !important;
-                color: #111827 !important;
                 border-left: 4px solid var(--plant-main) !important;
                 font-weight: 700 !important;
             }
             #sidebar #sidebarNav .plant-active-nav > i {
                 color: var(--plant-main) !important;
-                background: transparent !important;
+                background: var(--plant-icon-bg) !important;
                 box-shadow: none !important;
             }
-            #sidebar #adminBackDashboard {
-                background: transparent !important;
-                color: #111827 !important;
-            }
-            #sidebar #adminBackDashboard:hover { background: #f1f5f9 !important; }
+            #sidebar #adminBackDashboard { background: transparent !important; }
             #sidebar #collapseSidebarBtn {
                 color: var(--plant-main) !important;
                 border-color: var(--plant-border) !important;
-                background: #fff !important;
-            }
-            body[data-plant-theme] main header h1,
-            body[data-plant-theme] main header h2,
-            body[data-plant-theme] .plant-themed-text {
-                color: #111827 !important;
+                background: var(--plant-icon-bg) !important;
             }
             body[data-plant-theme] table thead,
-            body[data-plant-theme] .plant-table-heading {
-                background: var(--plant-main) !important;
-                color: #fff !important;
-            }
-            body[data-plant-theme] table thead th { color: #fff !important; }
+            body[data-plant-theme] .plant-table-heading,
             body[data-plant-theme] .bg-emerald-700 {
-                background: var(--plant-main) !important;
+                background: var(--plant-header-bg) !important;
+                color: #111827 !important;
+                border-color: var(--plant-border) !important;
+            }
+            body[data-plant-theme] table thead th,
+            body[data-plant-theme] .plant-table-heading * {
+                color: #111827 !important;
             }
         `;
         document.head.appendChild(style);
@@ -119,8 +119,8 @@
         installThemeStyles();
         document.body?.setAttribute('data-plant-theme', theme.key);
         document.documentElement.style.setProperty('--plant-main', theme.main);
-        document.documentElement.style.setProperty('--plant-dark', theme.dark);
-        document.documentElement.style.setProperty('--plant-soft', theme.soft);
+        document.documentElement.style.setProperty('--plant-icon-bg', theme.iconBg);
+        document.documentElement.style.setProperty('--plant-header-bg', theme.headerBg);
         document.documentElement.style.setProperty('--plant-border', theme.border);
 
         const footerBrand = document.querySelector('#sidebar .text-emerald-700');
