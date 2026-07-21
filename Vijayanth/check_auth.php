@@ -57,8 +57,9 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
     $injection = "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>";
 
     if ($currentPage === 'overview.php') {
-        $injection .= "\n<link rel=\"stylesheet\" href=\"assets/overview_inverter_ui.css?v=20260721-2\">";
+        $injection .= "\n<link rel=\"stylesheet\" href=\"assets/overview_inverter_ui.css?v=20260721-3\">";
         $injection .= "\n<script src=\"assets/inverter3_fix.js?v=20260721-4\"></script>";
+        $injection .= "\n<script src=\"assets/overview_ui_runtime_fix.js?v=20260721-1\"></script>";
     }
 
     $injection .= "\n<script src=\"assets/signed_plant_context.js?v=20260721-2\"></script>\n";
