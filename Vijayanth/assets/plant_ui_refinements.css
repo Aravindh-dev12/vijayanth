@@ -1,18 +1,18 @@
-/* Shared plant-theme refinements: stronger soft accents, black text, neutral surfaces. */
+/* Shared plant-theme refinements: medium-soft accents, black text, neutral surfaces. */
 body[data-plant-theme="violet"] {
     --plant-main: #6d28d9;
-    --plant-header-bg: #d8ccfb;
-    --plant-border: #b9a5ef;
+    --plant-header-bg: #c9b9f4;
+    --plant-border: #aa91e4;
 }
 body[data-plant-theme="emerald"] {
     --plant-main: #047857;
-    --plant-header-bg: #9fe3c4;
-    --plant-border: #68c99f;
+    --plant-header-bg: #82d3ad;
+    --plant-border: #54b98a;
 }
 body[data-plant-theme="blue"] {
     --plant-main: #1d4ed8;
-    --plant-header-bg: #b3d2fa;
-    --plant-border: #7fb1ef;
+    --plant-header-bg: #98bff0;
+    --plant-border: #6a9fdf;
 }
 
 body[data-plant-theme] table thead,
@@ -27,33 +27,34 @@ body[data-plant-theme] .plant-table-heading * {
     color: #111827 !important;
 }
 
-/* Overview: traditional dashboard information card below KPIs and above equipment. */
+/* Overview: traditional identity summary at the top of the dashboard content. */
 .overview-plant-info-card {
+    order: -10 !important;
     width: 100% !important;
     max-width: none !important;
-    margin: 0 0 18px !important;
-    border: 1px solid #dbe3ec !important;
+    margin: 0 !important;
+    border: 1px solid #cfd8e3 !important;
     border-radius: 12px !important;
-    box-shadow: 0 3px 12px rgba(15, 23, 42, .05) !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, .07) !important;
     background: #fff !important;
     overflow: hidden !important;
 }
 
 .overview-plant-info-card > h3 {
     margin: 0 !important;
-    padding: 11px 16px !important;
+    padding: 11px 18px !important;
     background: var(--plant-header-bg) !important;
     border-bottom: 1px solid var(--plant-border) !important;
     color: #111827 !important;
     font-size: 12px !important;
     font-weight: 800 !important;
-    letter-spacing: .04em !important;
+    letter-spacing: .045em !important;
     text-transform: uppercase;
 }
 
 .overview-plant-info-card > div {
     display: grid !important;
-    grid-template-columns: minmax(260px, 1.8fr) repeat(4, minmax(135px, 1fr)) !important;
+    grid-template-columns: minmax(280px, 2fr) repeat(4, minmax(130px, 1fr)) !important;
     gap: 0 !important;
     padding: 0 !important;
     align-items: stretch !important;
@@ -64,14 +65,18 @@ body[data-plant-theme] .plant-table-heading * {
     flex-direction: column !important;
     align-items: flex-start !important;
     justify-content: center !important;
-    gap: 5px !important;
-    min-height: 76px !important;
-    padding: 14px 16px !important;
+    gap: 6px !important;
+    min-height: 74px !important;
+    padding: 14px 17px !important;
     margin: 0 !important;
     border: 0 !important;
-    border-right: 1px solid #e5e7eb !important;
+    border-right: 1px solid #e2e8f0 !important;
     border-radius: 0 !important;
     background: #fff !important;
+}
+
+.overview-plant-info-card .flex.justify-between:first-child {
+    background: #f8fafc !important;
 }
 
 .overview-plant-info-card .flex.justify-between:last-child {
@@ -82,7 +87,7 @@ body[data-plant-theme] .plant-table-heading * {
     color: #64748b !important;
     font-size: 9px !important;
     font-weight: 800 !important;
-    letter-spacing: .06em !important;
+    letter-spacing: .07em !important;
     line-height: 1 !important;
     text-transform: uppercase;
 }
@@ -92,7 +97,7 @@ body[data-plant-theme] .plant-table-heading * {
     min-width: 0 !important;
     color: #111827 !important;
     font-size: 12px !important;
-    font-weight: 700 !important;
+    font-weight: 750 !important;
     line-height: 1.35 !important;
     text-align: left !important;
     overflow-wrap: anywhere;
@@ -101,8 +106,8 @@ body[data-plant-theme] .plant-table-heading * {
 .overview-plant-info-card #plantStatusBadge {
     display: inline-flex !important;
     align-items: center !important;
-    padding: 3px 8px !important;
-    border: 1px solid #d1d5db !important;
+    padding: 3px 9px !important;
+    border: 1px solid #cbd5e1 !important;
     border-radius: 999px !important;
     background: #f8fafc !important;
 }
@@ -114,11 +119,11 @@ body[data-plant-theme] .plant-table-heading * {
     .overview-plant-info-card .flex.justify-between:first-child {
         grid-column: span 2;
     }
+    .overview-plant-info-card .flex.justify-between {
+        border-bottom: 1px solid #e2e8f0 !important;
+    }
     .overview-plant-info-card .flex.justify-between:nth-child(3n) {
         border-right: 0 !important;
-    }
-    .overview-plant-info-card .flex.justify-between {
-        border-bottom: 1px solid #e5e7eb !important;
     }
 }
 
@@ -130,7 +135,7 @@ body[data-plant-theme] .plant-table-heading * {
         grid-column: 1 / -1;
     }
     .overview-plant-info-card .flex.justify-between:nth-child(odd) {
-        border-right: 1px solid #e5e7eb !important;
+        border-right: 1px solid #e2e8f0 !important;
     }
     .overview-plant-info-card .flex.justify-between:nth-child(even) {
         border-right: 0 !important;
@@ -145,8 +150,8 @@ body[data-plant-theme] .plant-table-heading * {
     .overview-plant-info-card .flex.justify-between:nth-child(n) {
         grid-column: auto;
         border-right: 0 !important;
-        border-bottom: 1px solid #e5e7eb !important;
-        min-height: 66px !important;
+        border-bottom: 1px solid #e2e8f0 !important;
+        min-height: 64px !important;
     }
     .overview-plant-info-card .flex.justify-between:last-child {
         border-bottom: 0 !important;
