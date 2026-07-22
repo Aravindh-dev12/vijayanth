@@ -10,6 +10,7 @@ $pass = isset($data['password']) ? (string)$data['password'] : '';
 
 $emailToPlant = [
     'admin@vijayanth.com' => getDefaultPlantId(),
+    'admin@scada.com' => getDefaultPlantId(),
     'bojaraj@scada.com' => 'vijayanth',
     'krishna@scada.com' => 'krishna',
     'vijayanth@scada.com' => 'vijayanth_cosmic',
@@ -20,6 +21,18 @@ $foundUser = null;
 $foundPlant = '';
 $foundConn = null;
 
+function loginResolvePlant($email, $selectedPlant, $rowPlant, $fallbackPlant, $role) {
+    global $PLANTS;
+    $role = strtolower(trim((string)$role));
+    $rowPlant = strtolower(trim((string)$rowPlant));
+
+    if ($role === 'admin') return getDefaultPlantId();
+    if ($selectedPlant && isset($PLANTS[$selectedPlant])) return $selectedPlant;
+    if ($rowPlant && isset($PLANTS[$rowPlant])) return $rowPlant;
+    if ($fallbackPlant && isset($PLANTS[$fallbackPlant])) return $fallbackPlant;
+    return getDefaultPlantId();
+}
+
 if ($selectedPlant && isset($PLANTS[$selectedPlant])) {
     $userConn = getPlantDbConn($selectedPlant);
     if ($userConn) {
@@ -27,7 +40,7 @@ if ($selectedPlant && isset($PLANTS[$selectedPlant])) {
         $res = $userConn->query("SELECT * FROM users WHERE LOWER(email)='$esc' LIMIT 1");
         if ($res && $res->num_rows > 0) {
             $foundUser = $res->fetch_assoc();
-            $foundPlant = $selectedPlant;
+            $foundPlant = loginResolvePlant($email, $selectedPlant, $foundUser['plant_id'] ?? '', $selectedPlant, $foundUser['role'] ?? 'user');
             $foundConn = $userConn;
         } else {
             $userConn->close();
@@ -43,9 +56,7 @@ if (!$foundUser) {
         $res = $userConn->query("SELECT * FROM users WHERE LOWER(email)='$esc' LIMIT 1");
         if ($res && $res->num_rows > 0) {
             $foundUser = $res->fetch_assoc();
-            $foundPlant = $foundUser['role'] === 'admin'
-                ? getDefaultPlantId()
-                : ($selectedPlant ?: ($foundUser['plant_id'] ?: $pid));
+            $foundPlant = loginResolvePlant($email, $selectedPlant, $foundUser['plant_id'] ?? '', $pid, $foundUser['role'] ?? 'user');
             $foundConn = $userConn;
             break;
         }
@@ -64,22 +75,29 @@ if (!password_verify($pass, $foundUser['password'])) {
     exit;
 }
 
+$role = strtolower(trim((string)($foundUser['role'] ?? 'user')));
 $token = bin2hex(random_bytes(32));
 $uid = (int)$foundUser['id'];
 $safePlant = $foundConn->real_escape_string($foundPlant);
 $foundConn->query("UPDATE users SET auth_token='$token', plant_id='$safePlant' WHERE id=$uid");
 $foundConn->close();
 
+$foundUser['role'] = $role;
 $foundUser['plant_id'] = $foundPlant;
 $_SESSION['user'] = $foundUser;
 $_SESSION['plant_id'] = $foundPlant;
 
+$redirect = $role === 'admin'
+    ? 'admin.php'
+    : 'overview.php?plant=' . rawurlencode($foundPlant);
+
 echo json_encode([
     'status' => 'success',
     'token' => $token,
+    'redirect' => $redirect,
     'user' => [
         'email' => $foundUser['email'],
-        'role' => $foundUser['role'],
+        'role' => $role,
         'plant_id' => $foundPlant,
     ],
 ]);
