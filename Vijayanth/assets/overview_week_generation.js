@@ -23,7 +23,8 @@
             const d = new Date(start.getTime() + index * DAY_MS);
             return {
                 key: localDateKey(d),
-                label: d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })
+                label: d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' }),
+                short: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
             };
         });
     }
@@ -36,11 +37,19 @@
         return Object.values(instances).find(chart => chart && chart.canvas === canvas) || null;
     }
 
-    function setTitle() {
+    function setTitle(days = weekDates()) {
         const canvas = document.getElementById('genChart');
         const card = canvas?.closest('.bg-white');
         const title = card?.querySelector('h4');
-        if (title) title.textContent = 'Generation Week (kWh)';
+        if (title) title.textContent = `Generation Week (${days[0].short} - ${days[6].short})`;
+    }
+
+    function niceMax(value) {
+        if (!Number.isFinite(value) || value <= 0) return 1000;
+        const magnitude = Math.pow(10, Math.floor(Math.log10(value)));
+        const normalized = value / magnitude;
+        const rounded = normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+        return rounded * magnitude;
     }
 
     function applyWeeklyChart() {
@@ -49,15 +58,19 @@
         if (!chart) return;
 
         const days = weekDates();
-        const dataMap = new Map((weeklyPayload.data || []).map(row => [row.date, Number(row.actual || 0)]));
+        const rows = weeklyPayload.data || [];
+        const dataMap = new Map(rows.map(row => [row.date, Number(row.actual || 0)]));
+        const expected = Math.max(...rows.map(row => Number(row.expected || 0)), 0);
         const labels = days.map(day => day.label);
         const values = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
+        const maxValue = Math.max(...values, expected, 0);
+        const suggestedMax = niceMax(maxValue * 1.15);
 
-        setTitle();
+        setTitle(days);
         chart.config.type = 'bar';
         chart.data.labels = labels;
         chart.data.datasets = [{
-            label: 'Weekly generation (kWh)',
+            label: 'Current week generation (kWh)',
             data: values,
             backgroundColor: '#059669',
             borderRadius: 5,
@@ -70,10 +83,15 @@
         chart.options.scales.x = chart.options.scales.x || {};
         chart.options.scales.y = chart.options.scales.y || {};
         chart.options.scales.x.grid = { display: false };
+        chart.options.scales.x.title = { display: true, text: 'Current week' };
         chart.options.scales.x.ticks = { autoSkip: false, maxRotation: 0, minRotation: 0 };
-        chart.options.scales.y.title = { display: true, text: 'kWh' };
+        chart.options.scales.y.title = { display: true, text: 'Generation (kWh)' };
         chart.options.scales.y.beginAtZero = true;
+        chart.options.scales.y.suggestedMax = suggestedMax;
         chart.options.scales.y.grid = { color: '#f1f5f9' };
+        chart.options.scales.y.ticks = {
+            callback: value => Number(value).toLocaleString('en-IN')
+        };
         chart.update('none');
     }
 
