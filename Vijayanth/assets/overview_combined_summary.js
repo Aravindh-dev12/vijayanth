@@ -14,18 +14,27 @@
     }
 
     function ensureStyle() {
-        if (q('overviewCombinedSummaryStyle')) return;
-        const style = document.createElement('style');
-        style.id = 'overviewCombinedSummaryStyle';
+        let style = q('overviewCombinedSummaryStyle');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'overviewCombinedSummaryStyle';
+            document.head.appendChild(style);
+        }
+
         style.textContent = `
             #overviewCombinedSummaryCard {
+                display: block !important;
                 width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                align-self: stretch !important;
                 margin: 0 0 18px 0 !important;
                 background: #ffffff !important;
                 border: 1px solid #dbe3ec !important;
                 border-radius: 14px !important;
                 box-shadow: 0 4px 14px rgba(15, 23, 42, .06) !important;
                 overflow: hidden !important;
+                box-sizing: border-box !important;
             }
             #overviewCombinedSummaryCard .combined-summary-title {
                 display: flex !important;
@@ -41,47 +50,49 @@
             }
             #overviewCombinedSummaryCard .combined-summary-scroll {
                 width: 100% !important;
-                overflow-x: auto !important;
+                overflow-x: hidden !important;
             }
             #overviewCombinedSummaryCard table {
                 width: 100% !important;
-                min-width: 1180px !important;
+                min-width: 0 !important;
+                max-width: none !important;
                 table-layout: fixed !important;
                 border-collapse: separate !important;
                 border-spacing: 0 !important;
-                font-size: 12px !important;
+                font-size: 11px !important;
                 text-align: center !important;
             }
             #overviewCombinedSummaryCard th {
-                height: 38px !important;
-                padding: 8px 10px !important;
+                height: 36px !important;
+                padding: 7px 5px !important;
                 background: var(--plant-header-bg, #93c5fd) !important;
                 color: #111827 !important;
                 border-right: 1px solid rgba(255, 255, 255, .65) !important;
-                font-size: 12px !important;
+                font-size: 11px !important;
                 font-weight: 900 !important;
                 line-height: 1.15 !important;
-                white-space: nowrap !important;
+                white-space: normal !important;
+                word-break: normal !important;
             }
             #overviewCombinedSummaryCard th:last-child { border-right: 0 !important; }
             #overviewCombinedSummaryCard td {
-                height: 48px !important;
-                padding: 8px 10px !important;
+                height: 46px !important;
+                padding: 7px 6px !important;
                 border-right: 1px solid #e5edf5 !important;
                 border-top: 1px solid #e5edf5 !important;
                 color: #111827 !important;
-                font-size: 12px !important;
+                font-size: 11px !important;
                 font-weight: 800 !important;
-                line-height: 1.25 !important;
+                line-height: 1.22 !important;
                 vertical-align: middle !important;
                 background: #ffffff !important;
+                overflow-wrap: anywhere !important;
             }
             #overviewCombinedSummaryCard td:last-child { border-right: 0 !important; }
             #overviewCombinedSummaryCard .plant-name-cell {
                 text-align: left !important;
                 font-weight: 900 !important;
                 white-space: normal !important;
-                overflow-wrap: anywhere !important;
             }
             #overviewCombinedSummaryCard #vcb_time,
             #overviewCombinedSummaryCard #vcb_power,
@@ -89,12 +100,12 @@
             #overviewCombinedSummaryCard #vcb_pf,
             #overviewCombinedSummaryCard #vcb_today,
             #overviewCombinedSummaryCard #vcb_total {
-                font-size: 12px !important;
+                font-size: 11px !important;
                 font-weight: 900 !important;
                 text-align: center !important;
                 vertical-align: middle !important;
-                height: 48px !important;
-                padding: 8px 10px !important;
+                height: 46px !important;
+                padding: 7px 6px !important;
                 background: #ffffff !important;
             }
             #overviewHeaderStatusBadge {
@@ -125,12 +136,15 @@
             .overview-table-info-row {
                 display: none !important;
             }
-            @media (max-width: 900px) {
+            @media (max-width: 1100px) {
+                #overviewCombinedSummaryCard .combined-summary-scroll { overflow-x: auto !important; }
+                #overviewCombinedSummaryCard table { min-width: 1040px !important; }
+            }
+            @media (max-width: 640px) {
                 #overviewCombinedSummaryCard .combined-summary-title { padding: 10px 12px !important; }
-                #overviewCombinedSummaryCard table { min-width: 1080px !important; }
+                #overviewCombinedSummaryCard table { min-width: 980px !important; }
             }
         `;
-        document.head.appendChild(style);
     }
 
     function findContent() {
@@ -196,19 +210,22 @@
         return td;
     }
 
-    function moveLiveCell(id) {
-        const el = q(id);
-        if (!el) return cell('--');
-        if (el.tagName.toLowerCase() === 'td') return el;
-        const td = cell('');
-        td.appendChild(el);
-        return td;
+    function liveCell(id, fallback = '--') {
+        let el = q(id);
+        if (!el) {
+            el = document.createElement('td');
+            el.id = id;
+            el.textContent = fallback;
+        }
+        return el;
     }
 
     function ensureCombinedSummary() {
         ensureStyle();
         const content = findContent();
         if (!content) return;
+        setImportant(content, 'width', '100%');
+        setImportant(content, 'align-items', 'stretch');
 
         const cfg = plantConfig();
         const name = cfg.name || q('headerPlantName')?.textContent || 'Plant';
@@ -237,17 +254,26 @@
             headRow.innerHTML = headers.map(h => `<th>${h}</th>`).join('');
         }
 
-        bodyRow.innerHTML = '';
+        const liveCells = {
+            time: liveCell('vcb_time', '--:--:--'),
+            power: liveCell('vcb_power'),
+            freq: liveCell('vcb_freq'),
+            pf: liveCell('vcb_pf'),
+            today: liveCell('vcb_today'),
+            total: liveCell('vcb_total')
+        };
+
+        bodyRow.textContent = '';
         bodyRow.appendChild(cell(name, 'plant-name-cell'));
         bodyRow.appendChild(cell(capacity));
         bodyRow.appendChild(cell(service));
         bodyRow.appendChild(cell(location));
-        bodyRow.appendChild(moveLiveCell('vcb_time'));
-        bodyRow.appendChild(moveLiveCell('vcb_power'));
-        bodyRow.appendChild(moveLiveCell('vcb_freq'));
-        bodyRow.appendChild(moveLiveCell('vcb_pf'));
-        bodyRow.appendChild(moveLiveCell('vcb_today'));
-        bodyRow.appendChild(moveLiveCell('vcb_total'));
+        bodyRow.appendChild(liveCells.time);
+        bodyRow.appendChild(liveCells.power);
+        bodyRow.appendChild(liveCells.freq);
+        bodyRow.appendChild(liveCells.pf);
+        bodyRow.appendChild(liveCells.today);
+        bodyRow.appendChild(liveCells.total);
 
         if (legacyOverview) setImportant(legacyOverview, 'display', 'none');
         const forcedRow = q('forcedOverviewInfoRow');
