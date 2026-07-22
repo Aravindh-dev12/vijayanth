@@ -33,12 +33,10 @@
         const canvas = document.getElementById('genChart');
         if (!canvas || typeof Chart === 'undefined') return null;
 
-        // Chart.js v3/v4 supports Chart.getChart. Some builds accept the id, some accept the canvas.
         if (typeof Chart.getChart === 'function') {
             return Chart.getChart(canvas) || Chart.getChart('genChart') || null;
         }
 
-        // Chart.js v2 stores instances differently. Support both direct canvas and chart.canvas paths.
         const instances = Chart.instances || {};
         const charts = Array.isArray(instances) ? instances : Object.values(instances);
         return charts.find(chart => {
@@ -96,7 +94,7 @@
         if (liveToday > 0) dataMap.set(todayKey, Math.max(dataMap.get(todayKey) || 0, liveToday));
 
         const expected = Math.max(...rows.map(row => Number(row.expected || 0)), expectedDailyFromConfig(), 1000);
-        const labels = days.map(day => day.label); // Sun, Mon, Tue...
+        const labels = days.map(day => day.label);
         const values = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
         const maxValue = Math.max(...values, expected, 0);
         const suggestedMax = niceMax(Math.max(maxValue * 1.15, expected));
@@ -106,7 +104,6 @@
 
         if (!chart) return;
 
-        // Make this chart a weekly chart every time; the old live page code may try to reuse it as hourly.
         chart.config.type = 'bar';
         chart.data.labels = labels;
         chart.data.datasets = [{
@@ -146,7 +143,7 @@
         lastFetchAt = now;
         const plantId = window.SIGNED_PLANT_ID || window.currentPlant || new URLSearchParams(window.location.search).get('plant') || '';
         if (!plantId) return;
-        fetch(`api.php?action=get_weekly_energy&plant_id=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
+        fetch(`api_weekly_generation.php?plant_id=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
             .then(res => res.json())
             .then(res => {
                 if (!res || res.status !== 'success') return;
@@ -159,9 +156,6 @@
     function start() {
         setTitle();
         loadWeeklyGeneration(true);
-
-        // Run frequently because the original page still updates the same canvas after WebSocket messages.
-        // This keeps the axis as Sun-Sat and keeps today's bar live for every plant.
         applyWeeklyChart();
         setTimeout(applyWeeklyChart, 250);
         setTimeout(applyWeeklyChart, 750);
