@@ -4,6 +4,11 @@
     const DAY_MS = 24 * 60 * 60 * 1000;
     let weeklyPayload = null;
     let lastFetchAt = 0;
+    let latestLabels = [];
+    let latestValues = [];
+    let latestSuggestedMax = 1000;
+    let chartUpdatePatched = false;
+    let applying = false;
 
     function pad(n) {
         return String(n).padStart(2, '0');
@@ -13,10 +18,9 @@
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     }
 
-    // Dashboard week is Sunday to Saturday.
     function weekDates(today = new Date()) {
         const start = new Date(today);
-        const day = start.getDay(); // 0 = Sunday
+        const day = start.getDay();
         start.setHours(0, 0, 0, 0);
         start.setDate(start.getDate() - day);
         return Array.from({ length: 7 }, (_, index) => {
@@ -27,6 +31,10 @@
                 short: d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })
             };
         });
+    }
+
+    function chartCanvas(chart) {
+        return chart?.canvas || chart?.chart?.canvas || chart?.ctx?.canvas || null;
     }
 
     function findGenerationChart() {
@@ -40,8 +48,8 @@
         const instances = Chart.instances || {};
         const charts = Array.isArray(instances) ? instances : Object.values(instances);
         return charts.find(chart => {
-            const chartCanvas = chart?.canvas || chart?.chart?.canvas || chart?.ctx?.canvas;
-            return chartCanvas === canvas || chartCanvas?.id === 'genChart';
+            const c = chartCanvas(chart);
+            return c === canvas || c?.id === 'genChart';
         }) || null;
     }
 
@@ -84,31 +92,15 @@
         canvas.dataset.weekValues = values.join(',');
     }
 
-    function applyWeeklyChart() {
-        const chart = findGenerationChart();
-        const days = weekDates();
-        const todayKey = localDateKey(new Date());
-        const rows = (weeklyPayload && Array.isArray(weeklyPayload.data)) ? weeklyPayload.data : [];
-        const dataMap = new Map(rows.map(row => [row.date, Number(row.actual || 0)]));
-        const liveToday = liveTodayKwh();
-        if (liveToday > 0) dataMap.set(todayKey, Math.max(dataMap.get(todayKey) || 0, liveToday));
-
-        const expected = Math.max(...rows.map(row => Number(row.expected || 0)), expectedDailyFromConfig(), 1000);
-        const labels = days.map(day => day.label);
-        const values = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
-        const maxValue = Math.max(...values, expected, 0);
-        const suggestedMax = niceMax(Math.max(maxValue * 1.15, expected));
-
-        setTitle(days);
-        updateDataAttributes(labels, values);
-
-        if (!chart) return;
+    function forceWeeklyConfig(chart) {
+        const canvas = chartCanvas(chart);
+        if (!chart || canvas?.id !== 'genChart' || !latestLabels.length) return;
 
         chart.config.type = 'bar';
-        chart.data.labels = labels;
+        chart.data.labels = latestLabels;
         chart.data.datasets = [{
             label: 'Current week generation (kWh)',
-            data: values,
+            data: latestValues,
             backgroundColor: '#059669',
             borderRadius: 5,
             barPercentage: 0.56,
@@ -129,11 +121,49 @@
         };
         chart.options.scales.y.title = { display: true, text: 'Generation (kWh)' };
         chart.options.scales.y.beginAtZero = true;
-        chart.options.scales.y.suggestedMax = suggestedMax;
+        chart.options.scales.y.suggestedMax = latestSuggestedMax;
         chart.options.scales.y.grid = { color: '#f1f5f9' };
         chart.options.scales.y.ticks = {
             callback: value => Number(value).toLocaleString('en-IN')
         };
+    }
+
+    function patchChartUpdate() {
+        if (chartUpdatePatched || typeof Chart === 'undefined' || !Chart.prototype || !Chart.prototype.update) return;
+        chartUpdatePatched = true;
+        const originalUpdate = Chart.prototype.update;
+        Chart.prototype.update = function (...args) {
+            if (!applying && chartCanvas(this)?.id === 'genChart') {
+                forceWeeklyConfig(this);
+            }
+            return originalUpdate.apply(this, args);
+        };
+    }
+
+    function applyWeeklyChart() {
+        patchChartUpdate();
+        const days = weekDates();
+        const todayKey = localDateKey(new Date());
+        const rows = (weeklyPayload && Array.isArray(weeklyPayload.data)) ? weeklyPayload.data : [];
+        const dataMap = new Map(rows.map(row => [row.date, Number(row.actual || 0)]));
+        const liveToday = liveTodayKwh();
+        if (liveToday > 0) dataMap.set(todayKey, Math.max(dataMap.get(todayKey) || 0, liveToday));
+
+        const expected = Math.max(...rows.map(row => Number(row.expected || 0)), expectedDailyFromConfig(), 1000);
+        latestLabels = days.map(day => day.label);
+        latestValues = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
+        const maxValue = Math.max(...latestValues, expected, 0);
+        latestSuggestedMax = niceMax(Math.max(maxValue * 1.15, expected));
+
+        setTitle(days);
+        updateDataAttributes(latestLabels, latestValues);
+
+        const chart = findGenerationChart();
+        if (!chart) return;
+
+        applying = true;
+        forceWeeklyConfig(chart);
+        applying = false;
         chart.update('none');
     }
 
@@ -154,6 +184,7 @@
     }
 
     function start() {
+        patchChartUpdate();
         setTitle();
         loadWeeklyGeneration(true);
         applyWeeklyChart();
