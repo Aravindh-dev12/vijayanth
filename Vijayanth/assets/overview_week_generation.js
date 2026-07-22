@@ -13,7 +13,7 @@
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     }
 
-    // Dashboard week is shown as Sunday to Saturday, with clear weekday x-axis labels.
+    // Dashboard week is Sunday to Saturday.
     function weekDates(today = new Date()) {
         const start = new Date(today);
         const day = start.getDay(); // 0 = Sunday
@@ -32,9 +32,19 @@
     function findGenerationChart() {
         const canvas = document.getElementById('genChart');
         if (!canvas || typeof Chart === 'undefined') return null;
-        if (typeof Chart.getChart === 'function') return Chart.getChart(canvas) || null;
+
+        // Chart.js v3/v4 supports Chart.getChart. Some builds accept the id, some accept the canvas.
+        if (typeof Chart.getChart === 'function') {
+            return Chart.getChart(canvas) || Chart.getChart('genChart') || null;
+        }
+
+        // Chart.js v2 stores instances differently. Support both direct canvas and chart.canvas paths.
         const instances = Chart.instances || {};
-        return Object.values(instances).find(chart => chart && chart.canvas === canvas) || null;
+        const charts = Array.isArray(instances) ? instances : Object.values(instances);
+        return charts.find(chart => {
+            const chartCanvas = chart?.canvas || chart?.chart?.canvas || chart?.ctx?.canvas;
+            return chartCanvas === canvas || chartCanvas?.id === 'genChart';
+        }) || null;
     }
 
     function setTitle(days = weekDates()) {
@@ -69,10 +79,15 @@
         return Number.isFinite(cap) && cap > 0 ? cap * 1000 * 0.8 * 5 : 1000;
     }
 
+    function updateDataAttributes(labels, values) {
+        const canvas = document.getElementById('genChart');
+        if (!canvas) return;
+        canvas.dataset.weekLabels = labels.join(',');
+        canvas.dataset.weekValues = values.join(',');
+    }
+
     function applyWeeklyChart() {
         const chart = findGenerationChart();
-        if (!chart) return;
-
         const days = weekDates();
         const todayKey = localDateKey(new Date());
         const rows = (weeklyPayload && Array.isArray(weeklyPayload.data)) ? weeklyPayload.data : [];
@@ -81,12 +96,17 @@
         if (liveToday > 0) dataMap.set(todayKey, Math.max(dataMap.get(todayKey) || 0, liveToday));
 
         const expected = Math.max(...rows.map(row => Number(row.expected || 0)), expectedDailyFromConfig(), 1000);
-        const labels = days.map(day => day.label);
+        const labels = days.map(day => day.label); // Sun, Mon, Tue...
         const values = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
         const maxValue = Math.max(...values, expected, 0);
         const suggestedMax = niceMax(Math.max(maxValue * 1.15, expected));
 
         setTitle(days);
+        updateDataAttributes(labels, values);
+
+        if (!chart) return;
+
+        // Make this chart a weekly chart every time; the old live page code may try to reuse it as hourly.
         chart.config.type = 'bar';
         chart.data.labels = labels;
         chart.data.datasets = [{
@@ -140,13 +160,16 @@
         setTitle();
         loadWeeklyGeneration(true);
 
-        // The original page code updates genChart as an hourly chart after every live WS update.
-        // Re-apply the weekly view continuously so the x-axis stays Sun-Sat and today's bar stays live.
+        // Run frequently because the original page still updates the same canvas after WebSocket messages.
+        // This keeps the axis as Sun-Sat and keeps today's bar live for every plant.
         applyWeeklyChart();
+        setTimeout(applyWeeklyChart, 250);
+        setTimeout(applyWeeklyChart, 750);
+        setTimeout(applyWeeklyChart, 1500);
         setInterval(() => {
             loadWeeklyGeneration(false);
             applyWeeklyChart();
-        }, 1000);
+        }, 500);
     }
 
     if (document.readyState === 'loading') {
