@@ -14,14 +14,19 @@
                 display: grid !important;
                 grid-template-columns: minmax(0, 1fr) 310px !important;
                 gap: 18px !important;
-                align-items: stretch !important;
+                align-items: start !important;
                 width: 100% !important;
                 margin: 0 0 22px 0 !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card,
             #forcedOverviewInfoRow .forced-plant-info-card {
                 margin: 0 !important;
-                height: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-overview-card {
+                align-self: start !important;
+                overflow: hidden !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card {
                 width: 310px !important;
@@ -30,13 +35,39 @@
                 padding: 0 !important;
                 border-radius: 12px !important;
                 justify-self: stretch !important;
-                align-self: stretch !important;
+                align-self: start !important;
                 overflow: hidden !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card h3 {
                 margin: 0 !important;
-                padding: 12px 14px !important;
-                border-bottom: 1px solid #e5e7eb !important;
+                padding: 7px 14px !important;
+                min-height: 32px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                background: var(--plant-header-bg) !important;
+                border-bottom: 1px solid var(--plant-border) !important;
+                color: #111827 !important;
+                font-size: 14px !important;
+                font-weight: 900 !important;
+                text-align: center !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-overview-card > .bg-emerald-700,
+            #forcedOverviewInfoRow .forced-plant-overview-card > .plant-table-heading {
+                padding-top: 5px !important;
+                padding-bottom: 5px !important;
+                min-height: 32px !important;
+                line-height: 1.1 !important;
+                background: var(--plant-header-bg) !important;
+                color: #111827 !important;
+                border-color: var(--plant-border) !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-overview-card table th,
+            #forcedOverviewInfoRow .forced-plant-overview-card table td {
+                padding-top: 6px !important;
+                padding-bottom: 6px !important;
+                line-height: 1.1 !important;
+                height: 28px !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card .space-y-2 {
                 display: grid !important;
@@ -48,8 +79,8 @@
                 grid-template-columns: 92px minmax(0, 1fr) !important;
                 gap: 8px !important;
                 align-items: center !important;
-                min-height: 39px !important;
-                padding: 8px 14px !important;
+                min-height: 31px !important;
+                padding: 6px 14px !important;
                 margin: 0 !important;
                 border-bottom: 1px solid #eef2f7 !important;
             }
@@ -105,7 +136,6 @@
         const content = findContentWrapper(overviewCard);
         if (!overviewCard || !plantInfoCard || !content || overviewCard === plantInfoCard) return;
 
-        // Disable older overview CSS grid rules on the content wrapper so the new top row controls placement.
         setImportant(content, 'display', 'flex');
         setImportant(content, 'flex-direction', 'column');
         setImportant(content, 'gap', '0');
@@ -118,7 +148,6 @@
             content.insertBefore(row, content.firstElementChild || null);
         }
 
-        // Move both cards into the same row, in this exact order.
         if (overviewCard.parentElement !== row) row.appendChild(overviewCard);
         if (plantInfoCard.parentElement !== row) row.appendChild(plantInfoCard);
 
@@ -128,7 +157,7 @@
         setImportant(row, 'display', 'grid');
         setImportant(row, 'grid-template-columns', 'minmax(0, 1fr) 310px');
         setImportant(row, 'gap', '18px');
-        setImportant(row, 'align-items', 'stretch');
+        setImportant(row, 'align-items', 'start');
         setImportant(row, 'width', '100%');
         setImportant(row, 'margin', '0 0 22px 0');
 
@@ -136,14 +165,16 @@
         setImportant(overviewCard, 'grid-row', '1');
         setImportant(overviewCard, 'width', '100%');
         setImportant(overviewCard, 'margin', '0');
-        setImportant(overviewCard, 'height', '100%');
+        setImportant(overviewCard, 'height', 'auto');
+        setImportant(overviewCard, 'align-self', 'start');
 
         setImportant(plantInfoCard, 'grid-column', '2');
         setImportant(plantInfoCard, 'grid-row', '1');
         setImportant(plantInfoCard, 'width', '310px');
         setImportant(plantInfoCard, 'max-width', '310px');
+        setImportant(plantInfoCard, 'height', 'auto');
         setImportant(plantInfoCard, 'margin', '0');
-        setImportant(plantInfoCard, 'align-self', 'stretch');
+        setImportant(plantInfoCard, 'align-self', 'start');
         setImportant(plantInfoCard, 'justify-self', 'stretch');
 
         const inverterGrid = document.getElementById('inverterGrid');
