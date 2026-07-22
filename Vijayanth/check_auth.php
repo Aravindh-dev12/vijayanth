@@ -64,7 +64,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
         $injection .= "\n<script src=\"assets/overview_ui_runtime_fix.js?v=20260721-7\"></script>";
         $injection .= "\n<script src=\"assets/overview_week_generation.js?v=20260721-4\"></script>";
         $injection .= "\n<script src=\"assets/overview_force_plant_info_position.js?v=20260721-6\"></script>";
-        $injection .= "\n<script src=\"assets/overview_tighten_status.js?v=20260721-1\"></script>";
+        $injection .= "\n<script src=\"assets/overview_tighten_status.js?v=20260721-2\"></script>";
     }
 
     if ($currentPage === 'sld.php') {
