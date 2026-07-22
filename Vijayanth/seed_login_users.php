@@ -1,6 +1,14 @@
 <?php
 // CLI-only helper to create/update dashboard login users.
-// Usage: php seed_login_users.php "your-password"
+// Usage:
+//   php seed_login_users.php
+//
+// Default development logins created by this script:
+//   admin@vijayanth.com / admin@123
+//   admin@scada.com     / admin@123
+//   vijayanth@scada.com / vijayanth@123
+//   krishna@scada.com   / krishna@123
+//   bojaraj@scada.com   / bojaraj@123
 
 if (PHP_SAPI !== 'cli') {
     http_response_code(403);
@@ -10,46 +18,44 @@ if (PHP_SAPI !== 'cli') {
 
 require __DIR__ . '/config.php';
 
-$password = $argv[1] ?? '';
-if ($password === '') {
-    echo "Usage: php seed_login_users.php \"your-password\"\n";
-    exit(1);
-}
-
 $accounts = [
     [
         'email' => 'admin@vijayanth.com',
+        'password' => 'admin@123',
         'role' => 'admin',
         'plant_id' => getDefaultPlantId(),
         'db_plant' => getDefaultPlantId(),
     ],
     [
         'email' => 'admin@scada.com',
+        'password' => 'admin@123',
         'role' => 'admin',
         'plant_id' => getDefaultPlantId(),
         'db_plant' => getDefaultPlantId(),
     ],
     [
-        'email' => 'bojaraj@scada.com',
+        'email' => 'vijayanth@scada.com',
+        'password' => 'vijayanth@123',
         'role' => 'user',
-        'plant_id' => 'vijayanth',
-        'db_plant' => 'vijayanth',
+        'plant_id' => 'vijayanth_cosmic',
+        'db_plant' => 'vijayanth_cosmic',
     ],
     [
         'email' => 'krishna@scada.com',
+        'password' => 'krishna@123',
         'role' => 'user',
         'plant_id' => 'krishna',
         'db_plant' => 'krishna',
     ],
     [
-        'email' => 'vijayanth@scada.com',
+        'email' => 'bojaraj@scada.com',
+        'password' => 'bojaraj@123',
         'role' => 'user',
-        'plant_id' => 'vijayanth_cosmic',
-        'db_plant' => 'vijayanth_cosmic',
+        'plant_id' => 'vijayanth',
+        'db_plant' => 'vijayanth',
     ],
 ];
 
-$hash = password_hash($password, PASSWORD_DEFAULT);
 $done = 0;
 
 foreach ($accounts as $account) {
@@ -67,6 +73,7 @@ foreach ($accounts as $account) {
     $email = $conn->real_escape_string(strtolower($account['email']));
     $role = $conn->real_escape_string($account['role']);
     $plantId = $conn->real_escape_string($account['plant_id']);
+    $hash = password_hash($account['password'], PASSWORD_DEFAULT);
     $safeHash = $conn->real_escape_string($hash);
 
     $res = $conn->query("SELECT id FROM users WHERE LOWER(email)='$email' LIMIT 1");
