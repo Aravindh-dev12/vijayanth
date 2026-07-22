@@ -24,10 +24,12 @@
         style.textContent = `
             #overviewCombinedSummaryCard {
                 display: block !important;
+                grid-column: 1 / -1 !important;
                 width: 100% !important;
                 max-width: none !important;
                 min-width: 0 !important;
                 align-self: stretch !important;
+                justify-self: stretch !important;
                 margin: 0 0 18px 0 !important;
                 background: #ffffff !important;
                 border: 1px solid #dbe3ec !important;
@@ -50,6 +52,7 @@
             }
             #overviewCombinedSummaryCard .combined-summary-scroll {
                 width: 100% !important;
+                max-width: none !important;
                 overflow-x: hidden !important;
             }
             #overviewCombinedSummaryCard table {
@@ -184,10 +187,11 @@
             wrap.className = 'overview-header-status-wrap';
             headerName.parentNode.insertBefore(wrap, headerName);
             wrap.appendChild(headerName);
-            setImportant(wrap, 'display', 'inline-flex');
-            setImportant(wrap, 'align-items', 'center');
-            setImportant(wrap, 'gap', '10px');
         }
+        setImportant(wrap, 'display', 'inline-flex');
+        setImportant(wrap, 'align-items', 'center');
+        setImportant(wrap, 'gap', '10px');
+
         let badge = q('overviewHeaderStatusBadge');
         if (!badge) {
             badge = document.createElement('span');
@@ -220,12 +224,24 @@
         return el;
     }
 
+    function forceContentFullWidth(content, card) {
+        setImportant(content, 'display', 'flex');
+        setImportant(content, 'flex-direction', 'column');
+        setImportant(content, 'align-items', 'stretch');
+        setImportant(content, 'width', '100%');
+        setImportant(content, 'max-width', 'none');
+        setImportant(content, 'grid-template-columns', 'none');
+        setImportant(card, 'width', '100%');
+        setImportant(card, 'max-width', 'none');
+        setImportant(card, 'grid-column', '1 / -1');
+        setImportant(card, 'justify-self', 'stretch');
+        setImportant(card, 'align-self', 'stretch');
+    }
+
     function ensureCombinedSummary() {
         ensureStyle();
         const content = findContent();
         if (!content) return;
-        setImportant(content, 'width', '100%');
-        setImportant(content, 'align-items', 'stretch');
 
         const cfg = plantConfig();
         const name = cfg.name || q('headerPlantName')?.textContent || 'Plant';
@@ -246,6 +262,8 @@
         } else if (card.parentElement !== content) {
             content.insertBefore(card, content.firstElementChild || null);
         }
+
+        forceContentFullWidth(content, card);
 
         const headRow = card.querySelector('thead tr');
         const bodyRow = card.querySelector('tbody tr');
@@ -292,6 +310,7 @@
         setInterval(ensureCombinedSummary, 2000);
         const main = document.querySelector('main');
         if (main) new MutationObserver(ensureCombinedSummary).observe(main, { childList: true, subtree: true, characterData: true });
+        window.addEventListener('resize', ensureCombinedSummary);
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
