@@ -55,6 +55,7 @@ ob_start(function ($html) use ($signedPlantIdJson, $signedRoleJson, $signedConfi
     if (stripos($html, '</body>') === false) return $html;
 
     $injection = "\n<script>window.SIGNED_PLANT_ID={$signedPlantIdJson};window.SIGNED_USER_ROLE={$signedRoleJson};window.SIGNED_PLANT_CONFIG={$signedConfigJson};</script>";
+    $injection .= "\n<link rel=\"stylesheet\" href=\"assets/responsive.css?v=20260722-1\">";
     $injection .= "\n<link rel=\"stylesheet\" href=\"assets/plant_ui_refinements.css?v=20260721-7\">";
 
     if ($currentPage === 'overview.php') {
