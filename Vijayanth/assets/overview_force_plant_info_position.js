@@ -6,33 +6,37 @@
     }
 
     function ensureStyle() {
-        if (document.getElementById('overviewForcePlantInfoStyle')) return;
-        const style = document.createElement('style');
-        style.id = 'overviewForcePlantInfoStyle';
+        let style = document.getElementById('overviewForcePlantInfoStyle');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'overviewForcePlantInfoStyle';
+            document.head.appendChild(style);
+        }
+
         style.textContent = `
             #forcedOverviewInfoRow {
                 display: grid !important;
-                grid-template-columns: minmax(0, 1fr) 310px !important;
+                grid-template-columns: minmax(0, 1fr) 320px !important;
                 gap: 18px !important;
-                align-items: stretch !important;
+                align-items: start !important;
                 width: 100% !important;
-                margin: 0 0 18px 0 !important;
+                margin: 0 0 20px 0 !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card,
             #forcedOverviewInfoRow .forced-plant-info-card {
                 margin: 0 !important;
-                height: 168px !important;
-                min-height: 168px !important;
-                max-height: 168px !important;
+                height: auto !important;
+                min-height: 0 !important;
+                max-height: none !important;
+                align-self: start !important;
                 overflow: hidden !important;
-                align-self: stretch !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card {
                 width: 100% !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card {
-                width: 310px !important;
-                max-width: 310px !important;
+                width: 320px !important;
+                max-width: 320px !important;
                 padding: 0 !important;
                 border-radius: 12px !important;
                 justify-self: stretch !important;
@@ -42,59 +46,68 @@
             #forcedOverviewInfoRow .forced-plant-overview-card > .bg-emerald-700,
             #forcedOverviewInfoRow .forced-plant-overview-card > .plant-table-heading {
                 margin: 0 !important;
+                min-height: 34px !important;
+                height: 34px !important;
                 padding: 7px 14px !important;
-                min-height: 36px !important;
-                height: 36px !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
                 background: var(--plant-header-bg) !important;
-                border-bottom: 1px solid var(--plant-border) !important;
                 border-color: var(--plant-border) !important;
                 color: #111827 !important;
-                font-size: 15px !important;
+                font-size: 14px !important;
                 font-weight: 900 !important;
                 line-height: 1.1 !important;
                 letter-spacing: .01em !important;
                 text-align: center !important;
             }
-            #forcedOverviewInfoRow .forced-plant-overview-card .overflow-x-auto {
-                height: calc(168px - 36px) !important;
+            #forcedOverviewInfoRow .forced-plant-info-card h3 {
+                border-bottom: 1px solid var(--plant-border) !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-overview-card > .overflow-x-auto {
+                height: auto !important;
+                display: block !important;
                 overflow-x: auto !important;
-                overflow-y: hidden !important;
-                display: flex !important;
-                align-items: flex-start !important;
+                overflow-y: visible !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card table {
-                height: 96px !important;
+                height: auto !important;
+                margin: 0 !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card table th,
             #forcedOverviewInfoRow .forced-plant-overview-card table td {
+                height: 36px !important;
                 padding-top: 9px !important;
                 padding-bottom: 9px !important;
-                line-height: 1.15 !important;
-                height: 48px !important;
-                font-size: 12px !important;
+                line-height: 1.1 !important;
+                vertical-align: middle !important;
+                font-size: 13px !important;
             }
             #forcedOverviewInfoRow .forced-plant-overview-card table th {
-                font-size: 12px !important;
+                font-size: 13px !important;
                 font-weight: 900 !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-overview-card table tbody,
+            #forcedOverviewInfoRow .forced-plant-overview-card table tr {
+                height: auto !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card .space-y-2 {
                 display: grid !important;
                 grid-template-columns: 1fr !important;
                 gap: 0 !important;
                 padding: 0 !important;
+                margin: 0 !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card .flex.justify-between {
                 display: grid !important;
-                grid-template-columns: 92px minmax(0, 1fr) !important;
+                grid-template-columns: 110px minmax(0, 1fr) !important;
                 gap: 8px !important;
                 align-items: center !important;
-                min-height: 26px !important;
-                height: 26px !important;
-                padding: 4px 14px !important;
+                min-height: 32px !important;
+                height: 32px !important;
+                padding: 6px 14px !important;
                 margin: 0 !important;
+                border: 0 !important;
                 border-bottom: 1px solid #eef2f7 !important;
                 background: #fff !important;
             }
@@ -103,17 +116,26 @@
             }
             #forcedOverviewInfoRow .forced-plant-info-card .flex.justify-between span:first-child {
                 color: #64748b !important;
-                font-size: 10px !important;
+                font-size: 11px !important;
                 font-weight: 700 !important;
-                line-height: 1.1 !important;
+                line-height: 1.15 !important;
+                white-space: nowrap !important;
             }
             #forcedOverviewInfoRow .forced-plant-info-card .flex.justify-between span:last-child {
-                text-align: right !important;
-                overflow-wrap: anywhere !important;
                 color: #111827 !important;
                 font-size: 11px !important;
                 font-weight: 800 !important;
-                line-height: 1.12 !important;
+                line-height: 1.15 !important;
+                text-align: right !important;
+                overflow-wrap: anywhere !important;
+                min-width: 0 !important;
+            }
+            #forcedOverviewInfoRow .forced-plant-info-card #plantStatusBadge {
+                color: #059669 !important;
+                background: transparent !important;
+                border: 0 !important;
+                padding: 0 !important;
+                justify-self: end !important;
             }
             .forced-overview-inverter-row {
                 display: block !important;
@@ -140,18 +162,9 @@
                 #forcedOverviewInfoRow {
                     grid-template-columns: 1fr !important;
                 }
-                #forcedOverviewInfoRow .forced-plant-overview-card,
-                #forcedOverviewInfoRow .forced-plant-info-card {
-                    height: auto !important;
-                    min-height: 0 !important;
-                    max-height: none !important;
-                }
                 #forcedOverviewInfoRow .forced-plant-info-card {
                     width: 100% !important;
                     max-width: none !important;
-                }
-                #forcedOverviewInfoRow .forced-plant-overview-card .overflow-x-auto {
-                    height: auto !important;
                 }
                 .forced-overview-kpi-row {
                     grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -163,7 +176,6 @@
                 }
             }
         `;
-        document.head.appendChild(style);
     }
 
     function findPlantInfoCard() {
@@ -224,40 +236,36 @@
         overviewCard.classList.add('forced-plant-overview-card');
         plantInfoCard.classList.add('forced-plant-info-card');
 
+        const desktop = window.innerWidth > 1100;
         setImportant(row, 'display', 'grid');
-        setImportant(row, 'grid-template-columns', window.innerWidth <= 1100 ? '1fr' : 'minmax(0, 1fr) 310px');
+        setImportant(row, 'grid-template-columns', desktop ? 'minmax(0, 1fr) 320px' : '1fr');
         setImportant(row, 'gap', '18px');
-        setImportant(row, 'align-items', 'stretch');
+        setImportant(row, 'align-items', 'start');
         setImportant(row, 'width', '100%');
-        setImportant(row, 'margin', '0 0 18px 0');
+        setImportant(row, 'height', 'auto');
+        setImportant(row, 'margin', '0 0 20px 0');
 
         setImportant(overviewCard, 'grid-column', '1');
         setImportant(overviewCard, 'grid-row', '1');
         setImportant(overviewCard, 'width', '100%');
+        setImportant(overviewCard, 'height', 'auto');
+        setImportant(overviewCard, 'min-height', '0');
+        setImportant(overviewCard, 'max-height', 'none');
         setImportant(overviewCard, 'margin', '0');
+        setImportant(overviewCard, 'align-self', 'start');
+        setImportant(overviewCard, 'overflow', 'hidden');
 
-        setImportant(plantInfoCard, 'grid-column', window.innerWidth <= 1100 ? '1' : '2');
-        setImportant(plantInfoCard, 'grid-row', window.innerWidth <= 1100 ? '2' : '1');
-        setImportant(plantInfoCard, 'width', window.innerWidth <= 1100 ? '100%' : '310px');
-        setImportant(plantInfoCard, 'max-width', window.innerWidth <= 1100 ? 'none' : '310px');
+        setImportant(plantInfoCard, 'grid-column', desktop ? '2' : '1');
+        setImportant(plantInfoCard, 'grid-row', desktop ? '1' : '2');
+        setImportant(plantInfoCard, 'width', desktop ? '320px' : '100%');
+        setImportant(plantInfoCard, 'max-width', desktop ? '320px' : 'none');
+        setImportant(plantInfoCard, 'height', 'auto');
+        setImportant(plantInfoCard, 'min-height', '0');
+        setImportant(plantInfoCard, 'max-height', 'none');
         setImportant(plantInfoCard, 'margin', '0');
+        setImportant(plantInfoCard, 'align-self', 'start');
         setImportant(plantInfoCard, 'justify-self', 'stretch');
-
-        if (window.innerWidth > 1100) {
-            setImportant(overviewCard, 'height', '168px');
-            setImportant(overviewCard, 'min-height', '168px');
-            setImportant(overviewCard, 'max-height', '168px');
-            setImportant(plantInfoCard, 'height', '168px');
-            setImportant(plantInfoCard, 'min-height', '168px');
-            setImportant(plantInfoCard, 'max-height', '168px');
-        } else {
-            setImportant(overviewCard, 'height', 'auto');
-            setImportant(overviewCard, 'min-height', '0');
-            setImportant(overviewCard, 'max-height', 'none');
-            setImportant(plantInfoCard, 'height', 'auto');
-            setImportant(plantInfoCard, 'min-height', '0');
-            setImportant(plantInfoCard, 'max-height', 'none');
-        }
+        setImportant(plantInfoCard, 'overflow', 'hidden');
 
         const inverterGrid = document.getElementById('inverterGrid');
         const inverterRow = inverterGrid ? inverterGrid.closest('.grid.grid-cols-12') : null;
