@@ -81,7 +81,8 @@
             .then(d => {
                 sessionStorage.removeItem('vs_redirect_guard');
                 if (d.status === 'success' && d.user) {
-                    if (d.user.role === 'admin') window.location.replace('admin.php');
+                    const role = String(d.user.role || '').toLowerCase();
+                    if (role === 'admin') window.location.replace('admin.php');
                     else if (d.user.plant_id) window.location.replace('overview.php?plant=' + encodeURIComponent(d.user.plant_id));
                     else {
                         sessionStorage.removeItem('vs_token');
@@ -112,6 +113,11 @@
         btn.disabled = true;
 
         try {
+            sessionStorage.clear();
+            localStorage.removeItem('vs_token');
+            localStorage.removeItem('vs_user');
+            localStorage.removeItem('userRole');
+
             const res = await fetch('api_login.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -120,15 +126,17 @@
             const data = await res.json();
 
             if (data.status === 'success') {
+                const role = String(data.user?.role || '').toLowerCase();
                 sessionStorage.setItem('vs_token', data.token);
                 sessionStorage.setItem('vs_user', JSON.stringify(data.user));
-                sessionStorage.setItem('vs_current_plant', data.user.plant_id || 'vijayanth');
+                sessionStorage.setItem('vs_current_plant', data.user?.plant_id || 'vijayanth');
                 localStorage.removeItem('vs_token');
                 localStorage.removeItem('vs_user');
                 localStorage.removeItem('userRole');
 
-                if (data.user.role === 'admin') window.location.replace('admin.php');
-                else if (data.user.plant_id) window.location.replace('overview.php?plant=' + encodeURIComponent(data.user.plant_id));
+                if (data.redirect) window.location.replace(data.redirect);
+                else if (role === 'admin') window.location.replace('admin.php');
+                else if (data.user?.plant_id) window.location.replace('overview.php?plant=' + encodeURIComponent(data.user.plant_id));
                 else {
                     errEl.textContent = 'No plant assigned to this user.';
                     errEl.classList.remove('hidden');
