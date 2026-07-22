@@ -10,10 +10,52 @@
         return Number.isFinite(n) ? n : 0;
     }
 
+    function findPlantInfoCard() {
+        return document.querySelector('.forced-plant-info-card') ||
+            Array.from(document.querySelectorAll('h3')).find(h =>
+                (h.textContent || '').trim().toLowerCase() === 'plant information'
+            )?.closest('.bg-white') || null;
+    }
+
     function removePlantInfoStatusRow() {
         const badge = document.getElementById('plantStatusBadge');
         const row = badge?.closest('.flex.justify-between') || badge?.parentElement;
         if (row) row.remove();
+    }
+
+    function combineNameCapacityRows() {
+        const info = findPlantInfoCard();
+        if (!info) return;
+
+        const rows = Array.from(info.querySelectorAll('.flex.justify-between'));
+        let nameRow = null;
+        let capacityRow = null;
+
+        rows.forEach(row => {
+            const label = (row.querySelector('span:first-child')?.textContent || '').trim().toLowerCase();
+            if (label === 'name') nameRow = row;
+            if (label === 'capacity') capacityRow = row;
+        });
+
+        if (!nameRow || !capacityRow) return;
+
+        const nameLabel = nameRow.querySelector('span:first-child');
+        const nameValue = nameRow.querySelector('span:last-child');
+        const capacityValue = capacityRow.querySelector('span:last-child');
+        if (!nameLabel || !nameValue || !capacityValue) return;
+
+        if (!nameValue.dataset.originalPlantName) {
+            nameValue.dataset.originalPlantName = nameValue.textContent.trim();
+        }
+        if (!capacityValue.dataset.originalPlantCapacity) {
+            capacityValue.dataset.originalPlantCapacity = capacityValue.textContent.trim();
+        }
+
+        const plantName = nameValue.dataset.originalPlantName;
+        const capacity = capacityValue.dataset.originalPlantCapacity;
+        nameLabel.textContent = 'Plant';
+        nameValue.textContent = `${plantName} - ${capacity}`;
+        capacityRow.remove();
     }
 
     function updateHeaderStatus() {
@@ -51,6 +93,7 @@
         if (!row || !overview || !info) return;
 
         removePlantInfoStatusRow();
+        combineNameCapacityRows();
 
         important(row, 'align-items', 'start');
         important(row, 'height', 'auto');
@@ -82,8 +125,8 @@
         });
 
         info.querySelectorAll('.flex.justify-between').forEach(item => {
-            important(item, 'min-height', '27px');
-            important(item, 'height', '27px');
+            important(item, 'min-height', '29px');
+            important(item, 'height', '29px');
             important(item, 'padding-top', '4px');
             important(item, 'padding-bottom', '4px');
         });
