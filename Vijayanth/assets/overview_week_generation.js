@@ -3,7 +3,7 @@
 
     const DAY_MS = 24 * 60 * 60 * 1000;
     let weeklyPayload = null;
-    let applyCount = 0;
+    let lastFetchAt = 0;
 
     function pad(n) {
         return String(n).padStart(2, '0');
@@ -13,18 +13,18 @@
         return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
     }
 
+    // Dashboard week is shown as Sunday to Saturday, with clear weekday x-axis labels.
     function weekDates(today = new Date()) {
         const start = new Date(today);
-        const day = start.getDay();
-        const diffToMonday = day === 0 ? -6 : 1 - day;
+        const day = start.getDay(); // 0 = Sunday
         start.setHours(0, 0, 0, 0);
-        start.setDate(start.getDate() + diffToMonday);
+        start.setDate(start.getDate() - day);
         return Array.from({ length: 7 }, (_, index) => {
             const d = new Date(start.getTime() + index * DAY_MS);
             return {
                 key: localDateKey(d),
-                label: d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' }),
-                short: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
+                label: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+                short: d.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })
             };
         });
     }
@@ -52,19 +52,39 @@
         return rounded * magnitude;
     }
 
+    function readNumericText(id) {
+        const text = document.getElementById(id)?.textContent || '';
+        const n = parseFloat(text.replace(/,/g, '').replace(/[^0-9.\-]/g, ''));
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    function liveTodayKwh() {
+        return Math.max(readNumericText('vcb_today'), readNumericText('today_energy_val'), 0);
+    }
+
+    function expectedDailyFromConfig() {
+        const plantId = window.SIGNED_PLANT_ID || window.currentPlant || new URLSearchParams(window.location.search).get('plant') || '';
+        const cfg = (window.SIGNED_PLANT_CONFIG && window.SIGNED_PLANT_CONFIG[plantId]) || {};
+        const cap = parseFloat(cfg.capacity || window.plantCapacity || 0);
+        return Number.isFinite(cap) && cap > 0 ? cap * 1000 * 0.8 * 5 : 1000;
+    }
+
     function applyWeeklyChart() {
-        if (!weeklyPayload) return;
         const chart = findGenerationChart();
         if (!chart) return;
 
         const days = weekDates();
-        const rows = weeklyPayload.data || [];
+        const todayKey = localDateKey(new Date());
+        const rows = (weeklyPayload && Array.isArray(weeklyPayload.data)) ? weeklyPayload.data : [];
         const dataMap = new Map(rows.map(row => [row.date, Number(row.actual || 0)]));
-        const expected = Math.max(...rows.map(row => Number(row.expected || 0)), 0);
+        const liveToday = liveTodayKwh();
+        if (liveToday > 0) dataMap.set(todayKey, Math.max(dataMap.get(todayKey) || 0, liveToday));
+
+        const expected = Math.max(...rows.map(row => Number(row.expected || 0)), expectedDailyFromConfig(), 1000);
         const labels = days.map(day => day.label);
         const values = days.map(day => Number((dataMap.get(day.key) || 0).toFixed(2)));
         const maxValue = Math.max(...values, expected, 0);
-        const suggestedMax = niceMax(maxValue * 1.15);
+        const suggestedMax = niceMax(Math.max(maxValue * 1.15, expected));
 
         setTitle(days);
         chart.config.type = 'bar';
@@ -74,7 +94,7 @@
             data: values,
             backgroundColor: '#059669',
             borderRadius: 5,
-            barPercentage: 0.58,
+            barPercentage: 0.56,
             categoryPercentage: 0.72
         }];
         chart.options.plugins = chart.options.plugins || {};
@@ -84,7 +104,12 @@
         chart.options.scales.y = chart.options.scales.y || {};
         chart.options.scales.x.grid = { display: false };
         chart.options.scales.x.title = { display: true, text: 'Current week' };
-        chart.options.scales.x.ticks = { autoSkip: false, maxRotation: 0, minRotation: 0 };
+        chart.options.scales.x.ticks = {
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+            font: { size: 11, weight: '700' }
+        };
         chart.options.scales.y.title = { display: true, text: 'Generation (kWh)' };
         chart.options.scales.y.beginAtZero = true;
         chart.options.scales.y.suggestedMax = suggestedMax;
@@ -95,7 +120,10 @@
         chart.update('none');
     }
 
-    function loadWeeklyGeneration() {
+    function loadWeeklyGeneration(force = false) {
+        const now = Date.now();
+        if (!force && now - lastFetchAt < 60000) return;
+        lastFetchAt = now;
         const plantId = window.SIGNED_PLANT_ID || window.currentPlant || new URLSearchParams(window.location.search).get('plant') || '';
         if (!plantId) return;
         fetch(`api.php?action=get_weekly_energy&plant_id=${encodeURIComponent(plantId)}`, { cache: 'no-store' })
@@ -110,13 +138,15 @@
 
     function start() {
         setTitle();
-        loadWeeklyGeneration();
-        const applyTimer = setInterval(() => {
-            applyCount += 1;
+        loadWeeklyGeneration(true);
+
+        // The original page code updates genChart as an hourly chart after every live WS update.
+        // Re-apply the weekly view continuously so the x-axis stays Sun-Sat and today's bar stays live.
+        applyWeeklyChart();
+        setInterval(() => {
+            loadWeeklyGeneration(false);
             applyWeeklyChart();
-            if (applyCount > 40) clearInterval(applyTimer);
-        }, 1500);
-        setInterval(loadWeeklyGeneration, 5 * 60 * 1000);
+        }, 1000);
     }
 
     if (document.readyState === 'loading') {
