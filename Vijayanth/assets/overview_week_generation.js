@@ -9,6 +9,7 @@
     let latestSuggestedMax = 1000;
     let chartUpdatePatched = false;
     let applying = false;
+    let weeklyChart = null;
 
     function pad(n) {
         return String(n).padStart(2, '0');
@@ -40,6 +41,8 @@
     function findGenerationChart() {
         const canvas = document.getElementById('genChart');
         if (!canvas || typeof Chart === 'undefined') return null;
+
+        if (weeklyChart && chartCanvas(weeklyChart) === canvas) return weeklyChart;
 
         if (typeof Chart.getChart === 'function') {
             return Chart.getChart(canvas) || Chart.getChart('genChart') || null;
@@ -128,6 +131,40 @@
         };
     }
 
+    function ensureOwnedWeeklyCanvas() {
+        const canvas = document.getElementById('genChart');
+        if (!canvas || typeof Chart === 'undefined') return;
+        if (canvas.dataset.weeklyOwned === '1') return;
+
+        const holder = canvas.parentElement;
+        if (!holder) return;
+
+        canvas.id = 'genChartHourlyLegacy';
+        canvas.style.display = 'none';
+        canvas.setAttribute('aria-hidden', 'true');
+
+        const weeklyCanvas = document.createElement('canvas');
+        weeklyCanvas.id = 'genChart';
+        weeklyCanvas.dataset.weeklyOwned = '1';
+        weeklyCanvas.style.width = '100%';
+        weeklyCanvas.style.height = '100%';
+        holder.appendChild(weeklyCanvas);
+
+        weeklyChart = new Chart(weeklyCanvas, {
+            type: 'bar',
+            data: { labels: latestLabels.length ? latestLabels : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], datasets: [{ label: 'Current week generation (kWh)', data: latestValues.length ? latestValues : [0,0,0,0,0,0,0], backgroundColor: '#059669', borderRadius: 5 }] },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { display: false }, title: { display: true, text: 'Current week' }, ticks: { autoSkip: false, maxRotation: 0, minRotation: 0, font: { size: 11, weight: '700' } } },
+                    y: { beginAtZero: true, suggestedMax: latestSuggestedMax, title: { display: true, text: 'Generation (kWh)' }, grid: { color: '#f1f5f9' }, ticks: { callback: value => Number(value).toLocaleString('en-IN') } }
+                }
+            }
+        });
+    }
+
     function patchChartUpdate() {
         if (chartUpdatePatched || typeof Chart === 'undefined' || !Chart.prototype || !Chart.prototype.update) return;
         chartUpdatePatched = true;
@@ -157,6 +194,7 @@
 
         setTitle(days);
         updateDataAttributes(latestLabels, latestValues);
+        ensureOwnedWeeklyCanvas();
 
         const chart = findGenerationChart();
         if (!chart) return;
