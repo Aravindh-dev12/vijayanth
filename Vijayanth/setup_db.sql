@@ -15,6 +15,25 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(20) DEFAULT 'user'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Default dashboard login accounts.
+-- These hashes are compatible with PHP password_hash()/password_verify().
+--   admin@vijayanth.com / admin@123
+--   admin@scada.com     / admin@123
+--   vijayanth@scada.com / vijayanth@123
+--   krishna@scada.com   / krishna@123
+--   bojaraj@scada.com   / bojaraj@123
+INSERT INTO users (email, password, plant_id, auth_token, role) VALUES
+    ('admin@vijayanth.com', '$2y$12$SHCLxY6HkRcPpGSE8.tJUugb4eEfk68FtBFEO2KHztXbi0suznrBu', 'vijayanth', NULL, 'admin'),
+    ('admin@scada.com', '$2y$12$SHCLxY6HkRcPpGSE8.tJUugb4eEfk68FtBFEO2KHztXbi0suznrBu', 'vijayanth', NULL, 'admin'),
+    ('vijayanth@scada.com', '$2y$12$F7.9ezKh2mUQ1Qo3Fc7eael.YAO3j76KSQ1/cBGH6GF2wIR5AfXne', 'vijayanth_cosmic', NULL, 'user'),
+    ('krishna@scada.com', '$2y$12$W2XEvRVkCNbwQkIySEo3g.Qtl7xLxxdQqPEj3niOBw1M8ztqC0fym', 'krishna', NULL, 'user'),
+    ('bojaraj@scada.com', '$2y$12$x6jYHVVgfUzhvBMvwQijVO2rIi5BHSVGnUmJO8bXoJ20ROySWW1nG', 'vijayanth', NULL, 'user')
+ON DUPLICATE KEY UPDATE
+    password = VALUES(password),
+    plant_id = VALUES(plant_id),
+    auth_token = NULL,
+    role = VALUES(role);
+
 CREATE TABLE IF NOT EXISTS inverter_data (
     id INT AUTO_INCREMENT PRIMARY KEY,
     plant_id VARCHAR(50) NOT NULL,
@@ -237,7 +256,5 @@ DELIMITER ;
 
 SET @snapshot = '2026-06-23 10:00:00';
 
--- Create/update login accounts after setup by running provision_login_users.php
--- with the three password environment variables set on the local server.
-
+-- Default login accounts are seeded above in the users table.
 -- Live telemetry is inserted by api_store.php. No demo plant data is seeded.
